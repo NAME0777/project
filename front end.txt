@@ -1,1 +1,530 @@
-front end
+import { useState } from "react";
+
+type ViewType =
+  | "login"
+  | "register"
+  | "subjects"
+  | "topics"
+  | "note"
+  | "editor"
+  | "ocr"
+  | "dashboard";
+
+interface Revision {
+  id: number;
+  editor: string;
+  date: string;
+  summary: string;
+  content: string;
+}
+
+interface NoteData {
+  id: number;
+  title: string;
+  content: string;
+  revisions: Revision[];
+}
+
+const subjectsData = [
+  { id: 1, code: "CS204", name: "โครงสร้างข้อมูลและขั้นตอนวิธี", topics: 8 },
+  { id: 2, code: "CS310", name: "ระบบฐานข้อมูล", topics: 6 },
+  { id: 3, code: "CS255", name: "วิศวกรรมซอฟต์แวร์", topics: 5 },
+];
+
+const topicsData: Record<number, { id: number; title: string; order: number }[]> = {
+  1: [
+    { id: 1, title: "1. Array และ Linked List", order: 1 },
+    { id: 2, title: "2. Stack และ Queue", order: 2 },
+    { id: 3, title: "3. Tree และ Binary Search Tree", order: 3 },
+    { id: 4, title: "4. Normalization", order: 4 },
+  ],
+  2: [
+    { id: 5, title: "1. Introduction to Database", order: 1 },
+    { id: 6, title: "2. ER Diagram", order: 2 },
+  ],
+  3: [{ id: 7, title: "1. SDLC Models", order: 1 }],
+};
+
+const initialNote: NoteData = {
+  id: 4,
+  title: "Normalization",
+  content:
+    "Normalization คือกระบวนการจัดโครงสร้างฐานข้อมูลเพื่อลดความซ้ำซ้อนของข้อมูล\n\n1NF: ทุก column ต้องเก็บค่าเดียว (atomic value)\n2NF: ต้องผ่าน 1NF และไม่มี partial dependency\n3NF: ต้องผ่าน 2NF และไม่มี transitive dependency",
+  revisions: [
+    {
+      id: 1,
+      editor: "มิว ธ.",
+      date: "8 ก.ย. 69 14:30",
+      summary: "เพิ่มตัวอย่าง 3NF",
+      content:
+        "Normalization คือกระบวนการจัดโครงสร้างฐานข้อมูลเพื่อลดความซ้ำซ้อนของข้อมูล\n\n1NF: ทุก column ต้องเก็บค่าเดียว (atomic value)\n2NF: ต้องผ่าน 1NF และไม่มี partial dependency\n3NF: ต้องผ่าน 2NF และไม่มี transitive dependency",
+    },
+    {
+      id: 2,
+      editor: "ปาล์ม พ.",
+      date: "5 ก.ย. 69 09:10",
+      summary: "สร้างโน้ตเริ่มต้น",
+      content:
+        "Normalization คือกระบวนการจัดโครงสร้างฐานข้อมูลเพื่อลดความซ้ำซ้อนของข้อมูล\n\n1NF: ทุก column ต้องเก็บค่าเดียว",
+    },
+  ],
+};
+
+export default function NotesHubPrototype() {
+  const [view, setView] = useState<ViewType>("login");
+  const [selectedSubject, setSelectedSubject] = useState<number | null>(null);
+  const [note, setNote] = useState<NoteData>(initialNote);
+  const [editContent, setEditContent] = useState(initialNote.content);
+  const [editSummary, setEditSummary] = useState("");
+  const [showHistory, setShowHistory] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [ocrFile, setOcrFile] = useState<string | null>(null);
+  const [ocrText, setOcrText] = useState<string | null>(null);
+  const [ocrProcessing, setOcrProcessing] = useState(false);
+  const [role, setRole] = useState<"student" | "admin">("student");
+
+  const NavBar = () => (
+    <div className="flex items-center justify-between bg-slate-900 text-white px-6 py-3">
+      <div className="font-bold text-lg flex items-center gap-2">
+        <span>📘</span> Notes Hub
+      </div>
+      <div className="flex gap-4 text-sm items-center">
+        <button onClick={() => setView("subjects")} className="hover:text-orange-400">
+          รายวิชา
+        </button>
+        <button onClick={() => setView("ocr")} className="hover:text-orange-400">
+          อัปโหลด OCR
+        </button>
+        {role === "admin" && (
+          <button onClick={() => setView("dashboard")} className="hover:text-orange-400">
+            แดชบอร์ด
+          </button>
+        )}
+        <span className="text-xs bg-slate-700 px-2 py-1 rounded">
+          {role === "admin" ? "👤 ผู้ดูแลระบบ" : "🎓 นักศึกษา"}
+        </span>
+        <button
+          onClick={() => setView("login")}
+          className="bg-orange-500 px-3 py-1 rounded hover:bg-orange-600"
+        >
+          ออกจากระบบ
+        </button>
+      </div>
+    </div>
+  );
+
+  const LoginView = () => (
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="bg-white rounded-lg shadow-lg p-8 w-96">
+        <div className="text-center mb-6">
+          <div className="text-4xl mb-2">📘</div>
+          <h1 className="text-xl font-bold text-slate-800">คลังโน้ตเรียนประจำสาขา</h1>
+          <p className="text-sm text-slate-500 mt-1">
+            รวมโน้ตของรุ่นพี่ ส่งต่อความรู้ให้รุ่นน้อง
+          </p>
+        </div>
+        <div className="space-y-3">
+          <div>
+            <label className="text-sm text-slate-600">อีเมลมหาวิทยาลัย</label>
+            <input
+              className="w-full border rounded px-3 py-2 mt-1 text-sm"
+              placeholder="6512xxxxx@kmitl.ac.th"
+              defaultValue="6512xxxxx@kmitl.ac.th"
+            />
+          </div>
+          <div>
+            <label className="text-sm text-slate-600">รหัสผ่าน</label>
+            <input
+              type="password"
+              className="w-full border rounded px-3 py-2 mt-1 text-sm"
+              placeholder="••••••••"
+              defaultValue="password123"
+            />
+          </div>
+          <div className="flex gap-2 text-xs">
+            <button
+              onClick={() => setRole("student")}
+              className={
+                "flex-1 border rounded py-1.5 " +
+                (role === "student" ? "bg-indigo-600 text-white" : "text-slate-600")
+              }
+            >
+              เข้าสู่ระบบแบบนักศึกษา
+            </button>
+            <button
+              onClick={() => setRole("admin")}
+              className={
+                "flex-1 border rounded py-1.5 " +
+                (role === "admin" ? "bg-indigo-600 text-white" : "text-slate-600")
+              }
+            >
+              เข้าสู่ระบบแบบผู้ดูแล
+            </button>
+          </div>
+          <button
+            onClick={() => setView("subjects")}
+            className="w-full bg-indigo-600 text-white rounded py-2 font-medium hover:bg-indigo-700"
+          >
+            เข้าสู่ระบบ
+          </button>
+          <div className="text-center text-sm text-slate-500">
+            ยังไม่มีบัญชี?{" "}
+            <button onClick={() => setView("register")} className="text-indigo-600 hover:underline">
+              สมัครสมาชิก
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const RegisterView = () => (
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="bg-white rounded-lg shadow-lg p-8 w-96">
+        <div className="text-center mb-6">
+          <div className="text-4xl mb-2">📘</div>
+          <h1 className="text-xl font-bold text-slate-800">สมัครสมาชิก</h1>
+          <p className="text-sm text-slate-500 mt-1">ใช้อีเมลของสถาบันเท่านั้น</p>
+        </div>
+        <div className="space-y-3">
+          <div>
+            <label className="text-sm text-slate-600">ชื่อ-นามสกุล</label>
+            <input className="w-full border rounded px-3 py-2 mt-1 text-sm" placeholder="ธีรภัทร์ อามาตย์" />
+          </div>
+          <div>
+            <label className="text-sm text-slate-600">รหัสนักศึกษา</label>
+            <input className="w-full border rounded px-3 py-2 mt-1 text-sm" placeholder="66200122" />
+          </div>
+          <div>
+            <label className="text-sm text-slate-600">อีเมลมหาวิทยาลัย</label>
+            <input className="w-full border rounded px-3 py-2 mt-1 text-sm" placeholder="66200122@kmitl.ac.th" />
+          </div>
+          <div>
+            <label className="text-sm text-slate-600">รหัสผ่าน</label>
+            <input type="password" className="w-full border rounded px-3 py-2 mt-1 text-sm" placeholder="••••••••" />
+          </div>
+          <button
+            onClick={() => setView("login")}
+            className="w-full bg-indigo-600 text-white rounded py-2 font-medium hover:bg-indigo-700"
+          >
+            สมัครสมาชิก
+          </button>
+          <div className="text-center text-sm text-slate-500">
+            มีบัญชีอยู่แล้ว?{" "}
+            <button onClick={() => setView("login")} className="text-indigo-600 hover:underline">
+              เข้าสู่ระบบ
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const SubjectsView = () => (
+    <div className="min-h-screen bg-slate-50">
+      <NavBar />
+      <div className="p-8 max-w-4xl mx-auto">
+        <h2 className="text-2xl font-bold text-slate-800 mb-1">รายวิชาทั้งหมด</h2>
+        <p className="text-slate-500 mb-6">เลือกวิชาเพื่อดูหัวข้อบทเรียนและคลังโน้ต</p>
+        <div className="grid grid-cols-3 gap-4">
+          {subjectsData.map((s) => (
+            <button
+              key={s.id}
+              onClick={() => {
+                setSelectedSubject(s.id);
+                setView("topics");
+              }}
+              className="bg-white border rounded-lg p-5 text-left hover:shadow-md hover:border-indigo-400 transition"
+            >
+              <div className="text-xs font-mono text-indigo-600 mb-1">{s.code}</div>
+              <div className="font-semibold text-slate-800 mb-3">{s.name}</div>
+              <div className="text-xs text-slate-500">{s.topics} หัวข้อบทเรียน</div>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  const TopicsView = () => {
+    const subject = subjectsData.find((s) => s.id === selectedSubject);
+    const topics = topicsData[selectedSubject ?? 1] ?? [];
+    return (
+      <div className="min-h-screen bg-slate-50">
+        <NavBar />
+        <div className="p-8 max-w-3xl mx-auto">
+          <button onClick={() => setView("subjects")} className="text-sm text-indigo-600 mb-4">
+            ← กลับไปหน้ารายวิชา
+          </button>
+          <h2 className="text-2xl font-bold text-slate-800 mb-1">
+            {subject?.code} - {subject?.name}
+          </h2>
+          <p className="text-slate-500 mb-6">ภาคการศึกษา 1/2569</p>
+          <div className="bg-white rounded-lg border divide-y">
+            {topics.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setView("note")}
+                className="w-full text-left px-5 py-4 hover:bg-slate-50 flex items-center justify-between"
+              >
+                <span className="text-slate-700">{t.title}</span>
+                <span className="text-slate-400">→</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const NoteView = () => (
+    <div className="min-h-screen bg-slate-50">
+      <NavBar />
+      <div className="p-8 max-w-3xl mx-auto">
+        <button onClick={() => setView("topics")} className="text-sm text-indigo-600 mb-4">
+          ← กลับไปหัวข้อบทเรียน
+        </button>
+        <div className="bg-white rounded-lg border p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-slate-800">{note.title}</h2>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setIsPlaying(!isPlaying)}
+                className="text-sm bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded hover:bg-emerald-200"
+              >
+                {isPlaying ? "⏸ หยุดฟัง" : "🔊 ฟังเสียง"}
+              </button>
+              <button
+                onClick={() => {
+                  setEditContent(note.content);
+                  setView("editor");
+                }}
+                className="text-sm bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded hover:bg-indigo-200"
+              >
+                ✏️ แก้ไข
+              </button>
+              <button
+                onClick={() => setShowHistory(!showHistory)}
+                className="text-sm bg-slate-100 text-slate-700 px-3 py-1.5 rounded hover:bg-slate-200"
+              >
+                🕒 ประวัติ
+              </button>
+            </div>
+          </div>
+
+          {isPlaying && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded px-4 py-2 mb-4 text-sm text-emerald-700 flex items-center gap-2">
+              <span className="animate-pulse">🔊</span> กำลังอ่านออกเสียง... (Text-to-Speech)
+            </div>
+          )}
+
+          <div className="whitespace-pre-line text-slate-700 leading-relaxed border-t pt-4">
+            {note.content}
+          </div>
+
+          {showHistory && (
+            <div className="mt-6 border-t pt-4">
+              <h3 className="font-semibold text-slate-800 mb-3">ประวัติการแก้ไข (Revisions)</h3>
+              <div className="space-y-2">
+                {note.revisions.map((r) => (
+                  <div key={r.id} className="bg-slate-50 rounded p-3 text-sm">
+                    <div className="flex justify-between text-slate-600">
+                      <span className="font-medium">{r.editor}</span>
+                      <span className="text-slate-400">{r.date}</span>
+                    </div>
+                    <div className="text-slate-500 mt-1">{r.summary}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  const EditorView = () => (
+    <div className="min-h-screen bg-slate-50">
+      <NavBar />
+      <div className="p-8 max-w-3xl mx-auto">
+        <button onClick={() => setView("note")} className="text-sm text-indigo-600 mb-4">
+          ← กลับไปดูโน้ต (ไม่บันทึก)
+        </button>
+        <div className="bg-white rounded-lg border p-6">
+          <h2 className="text-xl font-bold text-slate-800 mb-1">แก้ไขโน้ต (Wiki-style Editing)</h2>
+          <p className="text-sm text-slate-500 mb-4">
+            การแก้ไขจะถูกบันทึกเป็นเวอร์ชันใหม่ ไม่ทับของเดิม
+          </p>
+
+          <label className="text-sm text-slate-600">เนื้อหา</label>
+          <textarea
+            className="w-full border rounded p-3 mt-1 h-56 text-sm font-mono"
+            value={editContent}
+            onChange={(e) => setEditContent(e.target.value)}
+          />
+
+          <label className="text-sm text-slate-600 block mt-3">สรุปสิ่งที่แก้ไข (แนะนำ)</label>
+          <input
+            className="w-full border rounded px-3 py-2 mt-1 text-sm"
+            placeholder="เช่น เพิ่มตัวอย่าง, แก้คำผิด"
+            value={editSummary}
+            onChange={(e) => setEditSummary(e.target.value)}
+          />
+
+          <div className="flex gap-2 mt-4">
+            <button
+              onClick={() => {
+                const newRevision: Revision = {
+                  id: note.revisions.length + 1,
+                  editor: "คุณ (นักศึกษา)",
+                  date: "23 ส.ค. 69 21:00",
+                  summary: editSummary || "แก้ไขเนื้อหา",
+                  content: editContent,
+                };
+                setNote({
+                  ...note,
+                  content: editContent,
+                  revisions: [newRevision, ...note.revisions],
+                });
+                setEditSummary("");
+                setShowHistory(true);
+                setView("note");
+              }}
+              className="bg-indigo-600 text-white px-4 py-2 rounded text-sm hover:bg-indigo-700"
+            >
+              บันทึกเวอร์ชันใหม่
+            </button>
+            <button
+              onClick={() => setView("note")}
+              className="bg-slate-100 text-slate-700 px-4 py-2 rounded text-sm hover:bg-slate-200"
+            >
+              ยกเลิก
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const OcrView = () => (
+    <div className="min-h-screen bg-slate-50">
+      <NavBar />
+      <div className="p-8 max-w-3xl mx-auto">
+        <h2 className="text-xl font-bold text-slate-800 mb-1">อัปโหลดภาพเพื่อแปลงเป็นข้อความ (OCR)</h2>
+        <p className="text-sm text-slate-500 mb-4">
+          รองรับไฟล์ภาพ JPG, PNG ระบบจะแปลงข้อความให้อัตโนมัติ
+        </p>
+
+        <div className="bg-white rounded-lg border p-6">
+          <div className="border-2 border-dashed rounded-lg p-8 text-center">
+            <div className="text-3xl mb-2">📷</div>
+            <label className="text-sm text-indigo-600 cursor-pointer hover:underline">
+              เลือกไฟล์ภาพ
+              <input
+                type="file"
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files?.[0]) {
+                    setOcrFile(e.target.files[0].name);
+                    setOcrText(null);
+                  }
+                }}
+              />
+            </label>
+            {ocrFile && <div className="text-sm text-slate-600 mt-2">📄 {ocrFile}</div>}
+          </div>
+
+          {ocrFile && !ocrText && (
+            <button
+              onClick={() => {
+                setOcrProcessing(true);
+                setTimeout(() => {
+                  setOcrText(
+                    "Tree คือโครงสร้างข้อมูลที่มีลักษณะเป็นลำดับชั้น ประกอบด้วย Node และ Edge\nBinary Search Tree (BST) คือ Tree ที่แต่ละ Node มีลูกไม่เกิน 2 โหนด\nคุณสมบัติ: ค่าซ้ายน้อยกว่า Node, ค่าขวามากกว่า Node"
+                  );
+                  setOcrProcessing(false);
+                }, 1200);
+              }}
+              disabled={ocrProcessing}
+              className="mt-4 bg-indigo-600 text-white px-4 py-2 rounded text-sm hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {ocrProcessing ? "กำลังประมวลผล..." : "เริ่มแปลงข้อความ"}
+            </button>
+          )}
+
+          {ocrText && (
+            <div className="mt-4">
+              <label className="text-sm text-slate-600">
+                ข้อความที่แปลงได้ (ตรวจสอบ/แก้ไขก่อนบันทึก)
+              </label>
+              <textarea
+                className="w-full border rounded p-3 mt-1 h-40 text-sm"
+                value={ocrText}
+                onChange={(e) => setOcrText(e.target.value)}
+              />
+              <button
+                onClick={() => {
+                  setOcrFile(null);
+                  setOcrText(null);
+                  setView("subjects");
+                }}
+                className="mt-3 bg-emerald-600 text-white px-4 py-2 rounded text-sm hover:bg-emerald-700"
+              >
+                บันทึกเป็นโน้ตใหม่
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  const DashboardView = () => (
+    <div className="min-h-screen bg-slate-50">
+      <NavBar />
+      <div className="p-8 max-w-4xl mx-auto">
+        <h2 className="text-2xl font-bold text-slate-800 mb-6">แดชบอร์ดสำหรับผู้ดูแลระบบ</h2>
+        <div className="grid grid-cols-4 gap-4 mb-6">
+          {[
+            { label: "โน้ตทั้งหมด", value: "1,284" },
+            { label: "ผู้ใช้งานทั้งหมด", value: "612" },
+            { label: "ครั้งที่ฟัง TTS", value: "3,905" },
+            { label: "วิชายอดนิยม", value: "CS204" },
+          ].map((s) => (
+            <div key={s.label} className="bg-white border rounded-lg p-4">
+              <div className="text-xs text-slate-500">{s.label}</div>
+              <div className="text-xl font-bold text-slate-800 mt-1">{s.value}</div>
+            </div>
+          ))}
+        </div>
+        <div className="bg-white border rounded-lg p-5">
+          <h3 className="font-semibold text-slate-800 mb-3">ผู้แก้ไขโน้ตล่าสุด</h3>
+          <div className="text-sm text-slate-600 space-y-2">
+            <div className="flex justify-between border-b pb-2">
+              <span>มิว ธ. — แก้ไข "Normalization" (CS310)</span>
+              <span className="text-slate-400">8 ก.ย. 69</span>
+            </div>
+            <div className="flex justify-between border-b pb-2">
+              <span>ปาล์ม พ. — สร้างโน้ต "ER Diagram" (CS310)</span>
+              <span className="text-slate-400">7 ก.ย. 69</span>
+            </div>
+            <div className="flex justify-between">
+              <span>ตั้นน้ำ ก. — อัปโหลด OCR "Tree Structure" (CS204)</span>
+              <span className="text-slate-400">6 ก.ย. 69</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  if (view === "login") return <LoginView />;
+  if (view === "register") return <RegisterView />;
+  if (view === "subjects") return <SubjectsView />;
+  if (view === "topics") return <TopicsView />;
+  if (view === "note") return <NoteView />;
+  if (view === "editor") return <EditorView />;
+  if (view === "ocr") return <OcrView />;
+  if (view === "dashboard") return <DashboardView />;
+  return <LoginView />;
+}
