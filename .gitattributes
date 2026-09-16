@@ -1,2 +1,13 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+ของที่ใช้ 
+Django>=5.0
+djangorestframework
+djangorestframework-simplejwt
+django-cors-headers
+celery
+redis
+psycopg2-binary
+gTTS
+pytesseract
+Pillow

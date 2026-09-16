@@ -1,0 +1,43 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-paper text-ink antialiased;
+    font-family: "IBM Plex Sans Thai", system-ui, sans-serif;
+  }
+
+  /* โฟกัสด้วยคีย์บอร์ดต้องเห็นชัดทุกที่ */
+  :focus-visible {
+    outline: 2px solid theme("colors.pen.DEFAULT");
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  /* เส้นเน้นข้อความแบบปากกาไฮไลต์ ใช้กับหัวข้อหลักของหน้า */
+  .marker-underline {
+    background-image: linear-gradient(
+      to top,
+      theme("colors.marker.DEFAULT") 0,
+      theme("colors.marker.DEFAULT") 0.38em,
+      transparent 0.38em
+    );
+    padding-inline: 0.08em;
+  }
+}
