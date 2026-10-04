@@ -1,0 +1,60 @@
+export type Role = "student" | "admin";
+
+export type ViewName =
+  | "login"
+  | "register"
+  | "subjects"
+  | "topics"
+  | "note"
+  | "editor"
+  | "ocr"
+  | "dashboard";
+
+export interface Route {
+  name: ViewName;
+  subjectId?: number;
+  noteId?: number;
+}
+
+export interface Subject {
+  id: number;
+  code: string;
+  name: string;
+  term: string;
+}
+
+export interface Topic {
+  id: number;
+  subject: number;
+  order: number;
+  title: string;
+  note_id: number | null;
+  has_note: boolean;
+}
+
+export interface Revision {
+  id: number;
+  editor_name: string;
+  summary: string;
+  content: string;
+  created_at: string; // ISO date string จาก Django — format ตอนแสดงผลด้วย formatThaiDate()
+}
+
+export interface Note {
+  id: number;
+  subject: number;
+  title: string;
+  content: string;
+  source_file: string | null;
+  created_at: string;
+  updated_at: string;
+  revisions: Revision[];
+}
+
+export interface User {
+  id: number;
+  email: string;
+  full_name: string;
+  role: Role;
+  student_id: string | null;
+}

@@ -1,0 +1,87 @@
+# ============================================================
+# Notes Hub — Docker Compose
+# ============================================================
+# รันทั้งระบบด้วยคำสั่งเดียว ไม่ต้องลง Python/Node/PostgreSQL เองในเครื่องเลย:
+#
+#   docker compose up --build
+#
+# แล้วเปิด:
+#   http://localhost:5173        เว็บแอป (frontend)
+#   http://localhost:8000/api    Django REST API (backend)
+#   http://localhost:5050        pgAdmin4 (ดู/จัดการฐานข้อมูล)
+#
+# หยุดทั้งหมด:  docker compose down
+# หยุด + ลบข้อมูลใน DB ด้วย:  docker compose down -v
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: notes_hub
+    ports:
+      - "5432:5432"   # เผื่ออยากต่อด้วย pgAdmin/DBeaver ที่ลงในเครื่องโดยตรงด้วย
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@notes-hub.local
+      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_CONFIG_SERVER_MODE: "False"   # ล็อกอินครั้งเดียว ไม่ถามซ้ำทุกครั้ง
+    ports:
+      - "5050:80"
+    volumes:
+      - ./docker/pgadmin-servers.json:/pgadmin4/servers.json:ro
+      - pgadmin-data:/var/lib/pgadmin
+    depends_on:
+      db:
+        condition: service_healthy
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      DJANGO_SECRET_KEY: dev-only-change-me-in-production
+      DJANGO_DEBUG: "True"
+      DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,backend
+      DATABASE_URL: postgres://postgres:postgres@db:5432/notes_hub
+      CORS_ALLOWED_ORIGINS: http://localhost:5173
+      ALLOWED_EMAIL_DOMAIN: kmitl.ac.th
+      USE_S3_STORAGE: "False"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app          # แก้โค้ดในเครื่องแล้วเห็นผลทันที ไม่ต้อง build ใหม่
+      - backend-media:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    environment:
+      BACKEND_URL: http://backend:8000   # ดู vite.config.ts — ต้องใช้ชื่อ service ไม่ใช่ localhost
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - frontend-node-modules:/app/node_modules   # กัน node_modules ของเครื่อง host ทับของใน container
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
+  pgadmin-data:
+  backend-media:
+  frontend-node-modules:

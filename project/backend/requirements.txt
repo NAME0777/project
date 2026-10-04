@@ -1,0 +1,14 @@
+Django==6.1.1
+djangorestframework==3.18.1
+djangorestframework-simplejwt==5.5.1
+psycopg2-binary==2.9.13
+django-cors-headers==4.9.0
+django-storages==1.14.6
+boto3==1.43.103
+django-environ==0.12.0
+
+# Phase 2: OCR (scope item 3)
+# Requires system-level tesseract-ocr + tesseract-ocr-tha + poppler-utils too (see core/ocr.py)
+pytesseract==0.3.13
+pdf2image==1.17.0
+Pillow==12.1.1
