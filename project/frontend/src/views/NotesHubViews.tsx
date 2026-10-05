@@ -8,6 +8,7 @@
 import { useEffect, useState } from "react";
 import { api, formatThaiDate } from "../api";
 import { BackLink, Button, Field, Modal, PageShell, TextAreaField } from "../ui";
+import { mergeImagesToPdf } from "../utils/pdf";
 import type { Note, Subject, User, ViewName } from "../types";
 
 // ---- Helper: ตรวจสอบประเภทไฟล์ ----
@@ -46,8 +47,9 @@ export function NotesHubView({
   const [uploadSubject, setUploadSubject] = useState<number>(subjects[0]?.id || 0);
   const [uploadTitle, setUploadTitle] = useState("");
   const [uploadContent, setUploadContent] = useState("");
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [progressText, setProgressText] = useState("");
   const [modalError, setModalError] = useState<string | null>(null);
   const [modalSuccess, setModalSuccess] = useState<string | null>(null);
 
@@ -93,7 +95,7 @@ export function NotesHubView({
       setModalError("กรุณาเลือกรายวิชา");
       return;
     }
-    if (!uploadFile) {
+    if (uploadFiles.length === 0) {
       setModalError("กรุณาเลือกไฟล์เอกสารแนบ (PDF หรือ รูปภาพ)");
       return;
     }
@@ -101,26 +103,56 @@ export function NotesHubView({
     setModalError(null);
     setUploading(true);
     try {
+      let fileToSend: File;
+      const isSinglePdf =
+        uploadFiles.length === 1 &&
+        (uploadFiles[0].type === "application/pdf" ||
+          uploadFiles[0].name.toLowerCase().endsWith(".pdf"));
+
+      if (isSinglePdf) {
+        fileToSend = uploadFiles[0];
+      } else {
+        // หากเลือกรูปภาพ (1 รูป หรือ หลายรูป) ให้รวมเป็น PDF เล่มเดียวอัตโนมัติ
+        setProgressText(
+          uploadFiles.length > 1
+            ? `กำลังรวม ${uploadFiles.length} รูปภาพเป็นเอกสาร PDF…`
+            : "กำลังเตรียมไฟล์เอกสาร PDF…"
+        );
+        const pdfFileName = `${uploadTitle.trim().replace(/[/\\?%*:|"<>]/g, "_")}.pdf`;
+        fileToSend = await mergeImagesToPdf(uploadFiles, pdfFileName);
+      }
+
+      setProgressText("กำลังอัปโหลดไฟล์ขึ้นสู่ระบบ…");
       const created = await api.createNote(
         uploadSubject,
         uploadTitle.trim(),
         uploadContent,
-        uploadFile
+        fileToSend
       );
-      setModalSuccess("อัปโหลดโน้ตสรุปเข้าสู่ระบบสำเร็จ!");
+      setModalSuccess(
+        `อัปโหลดโน้ตสรุปเรียบร้อยแล้ว! ${
+          uploadFiles.length > 1 ? `(รวม ${uploadFiles.length} หน้าเป็น PDF)` : ""
+        }`
+      );
       setTimeout(() => {
         setShowModal(false);
         setUploadTitle("");
         setUploadContent("");
-        setUploadFile(null);
+        setUploadFiles([]);
+        setProgressText("");
         setModalSuccess(null);
         setUploading(false);
         loadNotes();
         onSelectNote(created.id);
       }, 700);
     } catch (err) {
-      setModalError(err instanceof Error ? err.message : "อัปโหลดไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+      setModalError(
+        err instanceof Error
+          ? err.message
+          : "อัปโหลดไม่สำเร็จ กรุณาลองใหม่อีกครั้ง"
+      );
       setUploading(false);
+      setProgressText("");
     }
   };
 
@@ -307,40 +339,125 @@ export function NotesHubView({
           />
 
           <div>
-            <label className="mb-1 block text-sm text-ink-soft">
-              เลือกไฟล์แนบ (PDF หรือ รูปภาพ)
-            </label>
-            <div className="flex flex-col gap-2 rounded border border-dashed border-paper-rule bg-paper/50 p-4">
+            <div className="mb-1.5 flex items-center justify-between">
+              <label className="text-sm font-medium text-ink-soft">
+                เลือกไฟล์เอกสาร (PDF หรือ รูปภาพหลายรูป)
+              </label>
+              {uploadFiles.length > 0 && (
+                <span className="text-xs font-semibold text-pen">
+                  {uploadFiles.length === 1 &&
+                  (uploadFiles[0].type === "application/pdf" ||
+                    uploadFiles[0].name.toLowerCase().endsWith(".pdf"))
+                    ? "เลือกแล้ว 1 ไฟล์ PDF"
+                    : `เลือกแล้ว ${uploadFiles.length} รูปภาพ (รวมเป็น 1 PDF)`}
+                </span>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-2.5 rounded border border-dashed border-paper-rule bg-paper/50 p-4">
               <input
                 id="notes_hub_file_input"
                 type="file"
+                multiple
                 accept=".pdf,image/png,image/jpeg,image/jpg,image/webp"
                 onChange={(e) => {
-                  const f = e.target.files?.[0] || null;
-                  setUploadFile(f);
+                  const selectedList = e.target.files ? Array.from(e.target.files) : [];
+                  if (selectedList.length === 0) return;
+
+                  const hasPdf = selectedList.some(
+                    (f) =>
+                      f.type === "application/pdf" ||
+                      f.name.toLowerCase().endsWith(".pdf")
+                  );
+                  if (hasPdf && selectedList.length > 1) {
+                    setModalError(
+                      "หากต้องการแนบไฟล์ PDF กรุณาเลือกไฟล์ PDF เพียง 1 ไฟล์ (หรือเลือกรูปภาพหลายรูป)"
+                    );
+                    return;
+                  }
+
+                  setModalError(null);
+                  setUploadFiles((prev) => {
+                    if (hasPdf) return [selectedList[0]];
+                    const nonPdfs = prev.filter(
+                      (f) =>
+                        f.type !== "application/pdf" &&
+                        !f.name.toLowerCase().endsWith(".pdf")
+                    );
+                    return [...nonPdfs, ...selectedList];
+                  });
                 }}
                 disabled={uploading}
                 className="block w-full text-sm text-ink-soft file:mr-3 file:rounded file:border-0 file:bg-ink file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-paper hover:file:bg-ink-soft cursor-pointer"
               />
-              {uploadFile && (
-                <div className="flex items-center justify-between rounded bg-white px-3 py-1.5 text-xs text-ink border border-paper-rule">
-                  <span className="truncate max-w-[280px]">
-                    📄 {uploadFile.name} ({(uploadFile.size / 1024).toFixed(1)} KB)
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setUploadFile(null);
-                      const el = document.getElementById("notes_hub_file_input") as HTMLInputElement | null;
-                      if (el) el.value = "";
-                    }}
-                    className="text-redpen hover:underline ml-2"
-                  >
-                    ลบไฟล์ออก
-                  </button>
+
+              {uploadFiles.length > 0 && (
+                <div className="space-y-2 mt-1">
+                  <div className="flex items-center justify-between text-xs text-ink-mute">
+                    <span>
+                      {uploadFiles.length > 1
+                        ? `📑 ลำดับหน้าในเล่ม (${uploadFiles.length} หน้า):`
+                        : "เอกสารที่เลือก:"}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUploadFiles([]);
+                        const el = document.getElementById(
+                          "notes_hub_file_input"
+                        ) as HTMLInputElement | null;
+                        if (el) el.value = "";
+                      }}
+                      className="text-redpen hover:underline"
+                    >
+                      ล้างไฟล์ทั้งหมด
+                    </button>
+                  </div>
+
+                  <ul className="max-h-44 overflow-y-auto divide-y divide-paper-rule rounded border border-paper-rule bg-white">
+                    {uploadFiles.map((file, idx) => (
+                      <li
+                        key={`${file.name}-${idx}`}
+                        className="flex items-center justify-between px-3 py-2 text-xs text-ink"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-paper-rule text-[10px] font-bold text-ink-mute">
+                            {idx + 1}
+                          </span>
+                          <span className="truncate max-w-[200px] sm:max-w-xs font-medium">
+                            {file.name}
+                          </span>
+                          <span className="text-[11px] text-ink-mute shrink-0">
+                            ({(file.size / 1024).toFixed(1)} KB)
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setUploadFiles((prev) => prev.filter((_, i) => i !== idx));
+                          }}
+                          className="ml-2 text-redpen hover:underline shrink-0"
+                        >
+                          ลบ
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+
+                  {uploadFiles.length > 1 && (
+                    <div className="rounded bg-ok-soft/70 px-3 py-2 text-xs text-ok flex items-center gap-1.5 border border-ok/20">
+                      <span>✨</span>
+                      <span>
+                        ระบบจะแปลงและรวมทั้ง <strong>{uploadFiles.length} รูปภาพ</strong> เป็นไฟล์ PDF สรุปบทเรียน 1 เล่มให้อัตโนมัติ
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
-              <p className="text-xs text-ink-mute">รองรับไฟล์ PDF, PNG, JPG หรือ WebP</p>
+
+              <p className="text-xs text-ink-mute">
+                💡 สามารถเลือกรูปภาพหลายรูปพร้อมกัน (Ctrl/Shift + คลิก) เพื่อรวมเป็นสมุดโน้ต PDF เล่มเดียว หรือเลือกไฟล์ PDF
+              </p>
             </div>
           </div>
 
@@ -365,8 +482,11 @@ export function NotesHubView({
             >
               ยกเลิก
             </Button>
-            <Button type="submit" disabled={uploading || !uploadTitle.trim()}>
-              {uploading ? "กำลังบันทึกและอัปโหลด…" : "บันทึกและอัปโหลด"}
+            <Button
+              type="submit"
+              disabled={uploading || !uploadTitle.trim() || uploadFiles.length === 0}
+            >
+              {uploading ? (progressText || "กำลังบันทึกและอัปโหลด…") : "บันทึกและอัปโหลด"}
             </Button>
           </div>
         </form>
