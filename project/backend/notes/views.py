@@ -59,11 +59,31 @@ class NoteDetailView(generics.RetrieveUpdateAPIView):
         )
 
 
-class NoteCreateView(generics.CreateAPIView):
-    """รองรับการสร้างโน้ตใหม่ พร้อมอัปโหลดไฟล์แนบ source_file แบบ multipart/form-data"""
-    serializer_class = CreateNoteSerializer
+class NoteListCreateView(generics.ListCreateAPIView):
+    """รายการโน้ตทั้งหมด (GET) และสร้างโน้ตใหม่ (POST) พร้อมอัปโหลดไฟล์แนบแบบ multipart/form-data"""
     permission_classes = [permissions.IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def get_serializer_class(self):
+        if self.request.method == "POST":
+            return CreateNoteSerializer
+        return NoteSerializer
+
+    def get_queryset(self):
+        qs = Note.objects.select_related("subject").prefetch_related("revisions", "revisions__editor").all()
+        subject_id = self.request.query_params.get("subject")
+        if subject_id:
+            qs = qs.filter(subject_id=subject_id)
+        has_file = self.request.query_params.get("has_file")
+        if has_file == "true":
+            qs = qs.exclude(source_file="").exclude(source_file__isnull=True)
+        search = self.request.query_params.get("search")
+        if search:
+            qs = qs.filter(title__icontains=search)
+        return qs.order_by("-created_at")
+
+
+NoteCreateView = NoteListCreateView
 
 
 class RevisionCreateView(APIView):
