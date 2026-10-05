@@ -9,11 +9,12 @@ import { useAuth, useCatalog, useNote, useRouter } from "./hooks";
 import { LoginView, RegisterView } from "./views/AuthViews";
 import { SubjectsView, TopicsView } from "./views/CatalogViews";
 import { NoteView, EditorView } from "./views/NoteViews";
+import { NotesHubView, NoteFileDetailView } from "./views/NotesHubViews";
 import { OcrView, DashboardView } from "./views/ToolViews";
 import type { ViewName } from "./types";
 
 export default function App() {
-  const { route, go, reset, back } = useRouter();
+  const { route, go, reset, back } = useRouter({ name: "notes" });
   const { user, login, logout, error: loginError, pending: loginPending, checking } = useAuth();
   const catalog = useCatalog(route.subjectId);
   const { note, loading: noteLoading, saveRevision } = useNote(route.noteId);
@@ -33,7 +34,7 @@ export default function App() {
       <LoginView
         onLogin={async (email, password) => {
           const ok = await login(email, password);
-          if (ok) reset("subjects");
+          if (ok) reset("notes");
         }}
         onGoRegister={() => go("register")}
         error={loginError}
@@ -150,8 +151,29 @@ export default function App() {
       }
       return <DashboardView user={user} onNavigate={navigate} onLogout={handleLogout} />;
 
+    case "notes":
+      return (
+        <NotesHubView
+          user={user}
+          subjects={catalog.subjects}
+          onNavigate={navigate}
+          onLogout={handleLogout}
+          onSelectNote={(noteId) => go("note-detail", { noteId })}
+        />
+      );
+
+    case "note-detail":
+      return (
+        <NoteFileDetailView
+          user={user}
+          noteId={route.noteId}
+          onNavigate={navigate}
+          onLogout={handleLogout}
+          onBack={back}
+        />
+      );
+
     case "subjects":
-    default:
       return (
         <SubjectsView
           user={user}
@@ -162,6 +184,17 @@ export default function App() {
           onOpenSubject={(subjectId) => go("topics", { subjectId })}
           onCreateSubject={catalog.createSubject}
           onDeleteSubject={catalog.deleteSubject}
+        />
+      );
+
+    default:
+      return (
+        <NotesHubView
+          user={user}
+          subjects={catalog.subjects}
+          onNavigate={navigate}
+          onLogout={handleLogout}
+          onSelectNote={(noteId) => go("note-detail", { noteId })}
         />
       );
   }

@@ -106,16 +106,46 @@ export const api = {
 
   getNote: (noteId: number) => request<Note>(`/notes/${noteId}/`),
 
+  getNotes: (params?: { subject?: number; hasFile?: boolean; search?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.subject) q.set("subject", String(params.subject));
+    if (params?.hasFile) q.set("has_file", "true");
+    if (params?.search) q.set("search", params.search);
+    const qs = q.toString() ? `?${q.toString()}` : "";
+    return request<Note[]>(`/notes/${qs}`).then((r) =>
+      Array.isArray(r) ? r : (r as { results: Note[] }).results || []
+    );
+  },
+
   saveRevision: (noteId: number, content: string, summary: string) =>
     request<Note>(`/notes/${noteId}/revisions/`, { method: "POST", body: JSON.stringify({ content, summary }) }),
 
-  createNote: (subject: number, title: string, content: string, sourceFile?: File) => {
+  createNote: (
+    subject: number,
+    title: string,
+    content: string,
+    sourceFile?: File | null,
+    topicId?: number
+  ) => {
     const form = new FormData();
     form.set("subject", String(subject));
     form.set("title", title);
     form.set("content", content);
     if (sourceFile) form.set("source_file", sourceFile);
+    if (topicId) form.set("topic", String(topicId));
     return request<Note>("/notes/", { method: "POST", body: form });
+  },
+
+  updateNote: (
+    noteId: number,
+    data: { title?: string; content?: string; sourceFile?: File | null; summary?: string }
+  ) => {
+    const form = new FormData();
+    if (data.title !== undefined) form.set("title", data.title);
+    if (data.content !== undefined) form.set("content", data.content);
+    if (data.summary !== undefined) form.set("summary", data.summary);
+    if (data.sourceFile) form.set("source_file", data.sourceFile);
+    return request<Note>(`/notes/${noteId}/`, { method: "PATCH", body: form });
   },
 
   runOcr: (file: File) => {
