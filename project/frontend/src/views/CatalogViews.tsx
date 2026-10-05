@@ -76,7 +76,11 @@ export function SubjectsView({
       width="wide"
       title="รายวิชาทั้งหมด"
       description="เลือกวิชาเพื่อดูหัวข้อบทเรียนและโน้ตที่รุ่นพี่เขียนไว้"
-      actions={isAdmin ? <Button variant="quiet" onClick={() => setShowForm((v) => !v)}>{showForm ? "ยกเลิก" : "+ เพิ่มรายวิชา"}</Button> : undefined}
+      actions={
+        <Button variant="quiet" onClick={() => setShowForm((v) => !v)}>
+          {showForm ? "ยกเลิก" : "+ เพิ่มรายวิชา"}
+        </Button>
+      }
     >
       {showForm && (
         <div className="mb-5 grid gap-3 rounded-sheet border border-paper-rule bg-white p-5 shadow-sheet sm:grid-cols-3">
@@ -226,7 +230,13 @@ export function TopicsView({
       title={subject?.name ?? "ไม่พบรายวิชา"}
       description={subject ? `${subject.code} · ภาคการศึกษา ${subject.term}` : undefined}
       breadcrumb={<BackLink label="รายวิชาทั้งหมด" onClick={onBack} />}
-      actions={isAdmin && subject ? <Button variant="quiet" onClick={() => setShowForm((v) => !v)}>{showForm ? "ยกเลิก" : "+ เพิ่มหัวข้อ"}</Button> : undefined}
+      actions={
+        subject ? (
+          <Button variant="quiet" onClick={() => setShowForm((v) => !v)}>
+            {showForm ? "ยกเลิก" : "+ เพิ่มหัวข้อบทเรียน"}
+          </Button>
+        ) : undefined
+      }
     >
       {showForm && (
         <div className="mb-5 flex flex-wrap items-end gap-3 rounded-sheet border border-paper-rule bg-white p-5 shadow-sheet">
