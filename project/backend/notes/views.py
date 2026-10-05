@@ -1,6 +1,7 @@
 import json
 from django.http import Http404
 from rest_framework import generics, permissions, status
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -9,9 +10,11 @@ from .serializers import CreateNoteSerializer, NoteSerializer
 from subjects.models import Topic
 
 
-class NoteDetailView(generics.RetrieveAPIView):
+class NoteDetailView(generics.RetrieveUpdateAPIView):
+    """รองรับทั้งดูรายละเอียด (GET) และแก้ไข/แนบไฟล์ใหม่ (PUT, PATCH) แบบ multipart/form-data"""
     serializer_class = NoteSerializer
     permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get_object(self):
         pk = self.kwargs.get("pk")
@@ -37,14 +40,35 @@ class NoteDetailView(generics.RetrieveAPIView):
 
         raise Http404("ไม่พบข้อมูลโน้ต")
 
+    def perform_update(self, serializer):
+        old_content = serializer.instance.content
+        note = serializer.save()
+        summary = self.request.data.get("summary")
+        if not summary:
+            if "source_file" in self.request.FILES:
+                summary = "อัปเดตไฟล์แนบต้นฉบับ"
+            elif old_content != note.content:
+                summary = "แก้ไขเนื้อหาโน้ต"
+            else:
+                summary = "อัปเดตข้อมูลโน้ต"
+        Revision.objects.create(
+            note=note,
+            editor=self.request.user,
+            summary=summary,
+            content=note.content,
+        )
+
 
 class NoteCreateView(generics.CreateAPIView):
+    """รองรับการสร้างโน้ตใหม่ พร้อมอัปโหลดไฟล์แนบ source_file แบบ multipart/form-data"""
     serializer_class = CreateNoteSerializer
     permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
 
 class RevisionCreateView(APIView):
     permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def _unwrap_payload(self, data):
         current = data
@@ -114,7 +138,12 @@ class RevisionCreateView(APIView):
                 note.subject = topic.subject
             note.save()
 
-        # 3. สร้าง Revision บันทึกเนื้อหา
+        # 3. จัดการไฟล์แนบ source_file (ถ้ามีส่งมาแบบ multipart/form-data)
+        if "source_file" in request.FILES:
+            note.source_file = request.FILES["source_file"]
+            note.save(update_fields=["source_file"])
+
+        # 4. สร้าง Revision บันทึกเนื้อหา
         Revision.objects.create(
             note=note,
             editor=request.user,
@@ -123,6 +152,6 @@ class RevisionCreateView(APIView):
         )
 
         return Response(
-            NoteSerializer(note).data,
+            NoteSerializer(note, context={"request": request}).data,
             status=status.HTTP_201_CREATED if created else status.HTTP_200_OK
         )
