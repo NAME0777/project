@@ -15,6 +15,7 @@ export type ViewName =
 export interface Route {
   name: ViewName;
   subjectId?: number;
+  topicId?: number;
   noteId?: number;
 }
 

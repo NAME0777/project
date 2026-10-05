@@ -74,8 +74,8 @@ export function SubjectsView({
       onNavigate={onNavigate}
       onLogout={onLogout}
       width="wide"
-      title="รายวิชาทั้งหมด"
-      description="เลือกวิชาเพื่อดูหัวข้อบทเรียนและโน้ตที่รุ่นพี่เขียนไว้"
+      title="เนื้อหาทั้งหมด"
+      description="เลือกเนื้อหาและหัวข้อบทเรียน"
       actions={
         <Button variant="quiet" onClick={() => setShowForm((v) => !v)}>
           {showForm ? "ยกเลิก" : "+ เพิ่มรายวิชา"}
@@ -131,7 +131,7 @@ interface TopicsViewProps {
   loading: boolean;
   onNavigate: (view: ViewName) => void;
   onLogout: () => void;
-  onOpenNote: (noteId: number) => void;
+  onOpenNote: (topicId: number, noteId: number | null) => void;
   onBack: () => void;
   onCreateTopic: (subject: number, order: number, title: string) => Promise<void>;
   onUpdateTopic: (id: number, title: string) => Promise<void>;
@@ -252,47 +252,44 @@ export function TopicsView({
         <p className="text-ink-soft">กำลังโหลดหัวข้อ…</p>
       ) : (
         <ol className="divide-y divide-paper-rule overflow-hidden rounded-sheet border border-paper-rule bg-white shadow-sheet">
-          {topics.map((topic) => {
-            const noteTargetId = topic.note_id || topic.id;
+          {topics.map((topic) => (
+            <li key={topic.id} className="flex items-center gap-4 px-5 py-4">
+              <span className="w-6 shrink-0 text-sm text-ink-mute">{topic.order}</span>
 
-            return (
-              <li key={topic.id} className="flex items-center gap-4 px-5 py-4">
-                <span className="w-6 shrink-0 text-sm text-ink-mute">{topic.order}</span>
-
-                {editingId === topic.id ? (
-                  <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                    <input
-                      autoFocus
-                      value={editingTitle}
-                      onChange={(e) => setEditingTitle(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") saveEdit(topic.id);
-                        if (e.key === "Escape") cancelEdit();
-                      }}
-                      className="min-w-[220px] flex-1 rounded border border-paper-rule px-3 py-2 text-ink outline-none focus:border-pen"
-                    />
-                    {editError && <p className="w-full text-sm text-redpen">{editError}</p>}
-                    <button
-                      onClick={() => saveEdit(topic.id)}
-                      disabled={updatingId === topic.id}
-                      className="rounded px-2 py-1 text-xs text-pen hover:bg-paper-rule disabled:opacity-50"
-                    >
-                      {updatingId === topic.id ? "กำลังบันทึก…" : "บันทึก"}
-                    </button>
-                    <button
-                      onClick={cancelEdit}
-                      disabled={updatingId === topic.id}
-                      className="rounded px-2 py-1 text-xs text-ink-mute hover:bg-paper-rule disabled:opacity-50"
-                    >
-                      ยกเลิก
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    <button
-                      onClick={() => onOpenNote(noteTargetId)}
-                      className="flex flex-1 items-center gap-4 text-left hover:opacity-80"
-                    >
+              {editingId === topic.id ? (
+                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                  <input
+                    autoFocus
+                    value={editingTitle}
+                    onChange={(e) => setEditingTitle(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") saveEdit(topic.id);
+                      if (e.key === "Escape") cancelEdit();
+                    }}
+                    className="min-w-[220px] flex-1 rounded border border-paper-rule px-3 py-2 text-ink outline-none focus:border-pen"
+                  />
+                  {editError && <p className="w-full text-sm text-redpen">{editError}</p>}
+                  <button
+                    onClick={() => saveEdit(topic.id)}
+                    disabled={updatingId === topic.id}
+                    className="rounded px-2 py-1 text-xs text-pen hover:bg-paper-rule disabled:opacity-50"
+                  >
+                    {updatingId === topic.id ? "กำลังบันทึก…" : "บันทึก"}
+                  </button>
+                  <button
+                    onClick={cancelEdit}
+                    disabled={updatingId === topic.id}
+                    className="rounded px-2 py-1 text-xs text-ink-mute hover:bg-paper-rule disabled:opacity-50"
+                  >
+                    ยกเลิก
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <button
+                    onClick={() => onOpenNote(topic.id, topic.note_id)}
+                    className="flex flex-1 items-center gap-4 text-left hover:opacity-80"
+                  >
                       <span className="text-ink font-medium">{topic.title}</span>
                       <span className={`ml-auto shrink-0 text-sm ${topic.has_note ? "text-pen font-medium" : "text-ink-mute"}`}>
                         {topic.has_note ? "อ่านโน้ต" : "ยังไม่มีใครเขียน (คลิกเพื่อเริ่มเขียน)"}
@@ -319,9 +316,8 @@ export function TopicsView({
                   </>
                 )}
               </li>
-            );
-          })}
-        </ol>
+            ))}
+          </ol>
       )}
       {!loading && topics.length === 0 && (
         <p className="rounded-sheet border border-dashed border-paper-rule p-8 text-center text-ink-soft">

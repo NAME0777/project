@@ -21,15 +21,9 @@ class TopicSerializer(serializers.ModelSerializer):
         fields = ["id", "subject", "order", "title", "note_id", "has_note"]
 
     def get_note_id(self, obj):
-        if obj.note_id:
-            return obj.note_id
-        note = Note.objects.filter(pk=obj.id).first()
-        return note.id if note else None
+        return obj.note_id
 
     def get_has_note(self, obj):
-        if obj.note_id:
-            return True
-        note = Note.objects.filter(pk=obj.id).first()
-        if note and ((note.content and len(note.content.strip()) > 0) or note.source_file):
-            return True
+        if obj.note:
+            return bool((obj.note.content and len(obj.note.content.strip()) > 0) or obj.note.source_file)
         return False
