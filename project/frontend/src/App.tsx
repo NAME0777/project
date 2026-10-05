@@ -90,6 +90,9 @@ export default function App() {
           onEdit={() =>
             go("editor", { subjectId: route.subjectId, topicId: route.topicId, noteId: route.noteId })
           }
+          onRollback={async (content, summary) => {
+            await saveRevision(content, summary);
+          }}
         />
       );
     }

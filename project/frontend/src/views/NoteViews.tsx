@@ -12,12 +12,30 @@ import type { Note, Revision, User, ViewName } from "../types";
 
 // ---- RevisionList: ไทม์ไลน์การแก้ไข + Diff Viewer เปรียบเทียบเวอร์ชัน ----
 
-function RevisionList({ revisions }: { revisions: Revision[] }) {
+interface RevisionListProps {
+  revisions: Revision[];
+  onRollback?: (content: string, summary: string) => Promise<void>;
+}
+
+function RevisionList({ revisions, onRollback }: RevisionListProps) {
   const [diffModal, setDiffModal] = useState<{
     open: boolean;
     oldRev: Revision | null;
     newRev: Revision | null;
   }>({ open: false, oldRev: null, newRev: null });
+
+  const [rollbackModal, setRollbackModal] = useState<{
+    open: boolean;
+    rev: Revision | null;
+    versionIndex: number;
+    submitting: boolean;
+  }>({ open: false, rev: null, versionIndex: 0, submitting: false });
+
+  const [previewModal, setPreviewModal] = useState<{
+    open: boolean;
+    rev: Revision | null;
+    versionIndex: number;
+  }>({ open: false, rev: null, versionIndex: 0 });
 
   const [compareOldId, setCompareOldId] = useState<number>(
     revisions.length > 1 ? revisions[1].id : revisions[0]?.id || 0
@@ -46,7 +64,9 @@ function RevisionList({ revisions }: { revisions: Revision[] }) {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-ink">ประวัติการแก้ไขและเวอร์ชัน (Revision History)</h2>
-          <p className="text-sm text-ink-soft">ทุกครั้งที่บันทึกจะเก็บเป็นเวอร์ชันใหม่ และสามารถเปรียบเทียบความแตกต่าง (Diff) ได้</p>
+          <p className="text-sm text-ink-soft">
+            ทุกครั้งที่บันทึกจะเก็บเป็นเวอร์ชันใหม่ สามารถเปรียบเทียบ (Diff) หรือย้อนกลับ (Rollback) ไปใช้เวอร์ชันเดิมได้
+          </p>
         </div>
 
         {revisions.length > 1 && (
@@ -85,6 +105,8 @@ function RevisionList({ revisions }: { revisions: Revision[] }) {
       <ol className="border-l border-paper-rule pl-5 ml-2 mt-6">
         {revisions.map((revision, index) => {
           const prevRevision = index < revisions.length - 1 ? revisions[index + 1] : null;
+          const versionNumber = revisions.length - index;
+
           return (
             <li key={revision.id} className="relative pb-6 last:pb-0">
               <span
@@ -99,6 +121,9 @@ function RevisionList({ revisions }: { revisions: Revision[] }) {
                   <span className="font-semibold text-ink text-sm">
                     {revision.editor_name || "ไม่ทราบผู้แก้ไข"}
                   </span>
+                  <span className="text-xs font-mono text-pen font-semibold">
+                    v{versionNumber}
+                  </span>
                   <span className="text-xs text-ink-mute">
                     {formatThaiDate(revision.created_at)}
                   </span>
@@ -109,22 +134,49 @@ function RevisionList({ revisions }: { revisions: Revision[] }) {
                   )}
                 </div>
 
-                {prevRevision && (
-                  <button
-                    onClick={() => openDiff(prevRevision, revision)}
-                    className="inline-flex items-center gap-1 rounded border border-paper-rule bg-paper px-2 py-1 text-xs font-medium text-pen hover:bg-paper-rule/60 transition-colors"
-                  >
-                    <span>🔍 ดู Diff (เทียบกับก่อนหน้า)</span>
-                  </button>
-                )}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {index > 0 && (
+                    <button
+                      onClick={() => setPreviewModal({ open: true, rev: revision, versionIndex: versionNumber })}
+                      className="inline-flex items-center gap-1 rounded border border-paper-rule bg-paper px-2 py-1 text-xs font-medium text-ink hover:bg-paper-rule/60 transition-colors"
+                    >
+                      <span>👁️ ดูเนื้อหา</span>
+                    </button>
+                  )}
+
+                  {prevRevision && (
+                    <button
+                      onClick={() => openDiff(prevRevision, revision)}
+                      className="inline-flex items-center gap-1 rounded border border-paper-rule bg-paper px-2 py-1 text-xs font-medium text-pen hover:bg-paper-rule/60 transition-colors"
+                    >
+                      <span>🔍 ดู Diff</span>
+                    </button>
+                  )}
+
+                  {index > 0 && onRollback && (
+                    <button
+                      onClick={() =>
+                        setRollbackModal({
+                          open: true,
+                          rev: revision,
+                          versionIndex: versionNumber,
+                          submitting: false,
+                        })
+                      }
+                      className="inline-flex items-center gap-1 rounded border border-pen/30 bg-pen/5 px-2.5 py-1 text-xs font-medium text-pen hover:bg-pen/15 transition-colors"
+                    >
+                      <span>⏪ ย้อนกลับเป็นเวอร์ชันนี้</span>
+                    </button>
+                  )}
+                </div>
               </div>
-              <p className="mt-1 text-sm text-ink-soft">{revision.summary}</p>
+              <p className="mt-1 text-sm text-ink-soft">{revision.summary || "-"}</p>
             </li>
           );
         })}
       </ol>
 
-      {/* Modal Diff Viewer */}
+      {/* Modal 1: Diff Viewer */}
       <Modal
         isOpen={diffModal.open}
         onClose={() => setDiffModal({ open: false, oldRev: null, newRev: null })}
@@ -179,9 +231,128 @@ function RevisionList({ revisions }: { revisions: Revision[] }) {
             )}
           </div>
 
-          <div className="flex justify-end pt-2">
+          <div className="flex items-center justify-between pt-2 border-t border-paper-rule">
+            {onRollback && diffModal.oldRev && (
+              <Button
+                variant="confirm"
+                className="text-xs"
+                onClick={() => {
+                  const targetRev = diffModal.oldRev;
+                  setDiffModal({ open: false, oldRev: null, newRev: null });
+                  if (targetRev) {
+                    const vIndex =
+                      revisions.length - revisions.findIndex((r) => r.id === targetRev.id);
+                    setRollbackModal({
+                      open: true,
+                      rev: targetRev,
+                      versionIndex: vIndex,
+                      submitting: false,
+                    });
+                  }
+                }}
+              >
+                ⏪ ย้อนกลับไปใช้เวอร์ชันก่อนหน้านี้
+              </Button>
+            )}
             <Button variant="quiet" onClick={() => setDiffModal({ open: false, oldRev: null, newRev: null })}>
               ปิดหน้าต่าง
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal 2: Preview Revision Content */}
+      <Modal
+        isOpen={previewModal.open}
+        onClose={() => setPreviewModal({ open: false, rev: null, versionIndex: 0 })}
+        title={`เนื้อหาเวอร์ชัน v${previewModal.versionIndex}`}
+        description={
+          previewModal.rev
+            ? `แก้ไขโดย: ${previewModal.rev.editor_name || "ไม่ระบุ"} · เมื่อ ${formatThaiDate(previewModal.rev.created_at)} · "${previewModal.rev.summary || "ไม่มีสรุป"}"`
+            : undefined
+        }
+      >
+        <div className="space-y-4">
+          <div className="max-h-[460px] overflow-y-auto rounded-lg border border-paper-rule bg-paper/40 p-4 text-sm text-ink-soft whitespace-pre-line leading-relaxed">
+            {previewModal.rev?.content || "ไม่มีเนื้อหา"}
+          </div>
+          <div className="flex items-center justify-between pt-2 border-t border-paper-rule">
+            {onRollback && previewModal.rev && (
+              <Button
+                variant="confirm"
+                className="text-xs"
+                onClick={() => {
+                  const rev = previewModal.rev;
+                  const vIndex = previewModal.versionIndex;
+                  setPreviewModal({ open: false, rev: null, versionIndex: 0 });
+                  if (rev) {
+                    setRollbackModal({ open: true, rev, versionIndex: vIndex, submitting: false });
+                  }
+                }}
+              >
+                ⏪ ย้อนกลับไปใช้เวอร์ชันนี้
+              </Button>
+            )}
+            <Button variant="quiet" onClick={() => setPreviewModal({ open: false, rev: null, versionIndex: 0 })}>
+              ปิดหน้าต่าง
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal 3: Confirm Rollback */}
+      <Modal
+        isOpen={rollbackModal.open}
+        onClose={() => {
+          if (!rollbackModal.submitting) {
+            setRollbackModal({ open: false, rev: null, versionIndex: 0, submitting: false });
+          }
+        }}
+        title={`ยืนยันการย้อนเนื้อหากลับไปยังเวอร์ชัน v${rollbackModal.versionIndex}`}
+        description="ระบบจะนำเนื้อหาของเวอร์ชันนี้มาบันทึกเป็นเวอร์ชันใหม่ล่าสุด โดยไม่ลบประวัติการแก้ไขก่อนหน้า"
+      >
+        <div className="space-y-4">
+          {rollbackModal.rev && (
+            <div className="rounded border border-pen/20 bg-pen/5 p-3.5 text-xs text-ink space-y-1.5">
+              <p className="font-semibold text-pen">ข้อมูลเวอร์ชันที่จะย้อนกลับ:</p>
+              <p>• <strong>เวอร์ชัน:</strong> v{rollbackModal.versionIndex}</p>
+              <p>• <strong>ผู้เขียน:</strong> {rollbackModal.rev.editor_name || "ไม่ระบุ"}</p>
+              <p>• <strong>บันทึกเมื่อ:</strong> {formatThaiDate(rollbackModal.rev.created_at)}</p>
+              <p>• <strong>คำอธิบายเดิม:</strong> {rollbackModal.rev.summary || "-"}</p>
+            </div>
+          )}
+
+          <div>
+            <p className="mb-1.5 text-xs font-medium text-ink-soft">ตัวอย่างเนื้อหาที่จะถูกนำมาใช้:</p>
+            <div className="max-h-48 overflow-y-auto rounded border border-paper-rule bg-paper/60 p-3 font-mono text-xs leading-relaxed text-ink-soft whitespace-pre-line">
+              {rollbackModal.rev?.content || "ไม่มีเนื้อหา"}
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-paper-rule">
+            <Button
+              variant="quiet"
+              disabled={rollbackModal.submitting}
+              onClick={() => setRollbackModal({ open: false, rev: null, versionIndex: 0, submitting: false })}
+            >
+              ยกเลิก
+            </Button>
+            <Button
+              disabled={rollbackModal.submitting}
+              onClick={async () => {
+                if (!rollbackModal.rev || !onRollback) return;
+                setRollbackModal((prev) => ({ ...prev, submitting: true }));
+                try {
+                  const summary = `ย้อนกลับไปยังเวอร์ชัน v${rollbackModal.versionIndex} (${formatThaiDate(rollbackModal.rev.created_at)})`;
+                  await onRollback(rollbackModal.rev.content, summary);
+                  setRollbackModal({ open: false, rev: null, versionIndex: 0, submitting: false });
+                } catch (err) {
+                  alert(err instanceof Error ? err.message : "ย้อนเวอร์ชันไม่สำเร็จ");
+                  setRollbackModal((prev) => ({ ...prev, submitting: false }));
+                }
+              }}
+            >
+              {rollbackModal.submitting ? "กำลังย้อนกลับ…" : "ยืนยันย้อนกลับเวอร์ชันนี้"}
             </Button>
           </div>
         </div>
@@ -202,6 +373,7 @@ interface NoteViewProps {
   onLogout: () => void;
   onEdit: () => void;
   onBack: () => void;
+  onRollback?: (content: string, summary: string) => Promise<void>;
 }
 
 export function NoteView({
@@ -214,9 +386,20 @@ export function NoteView({
   onLogout,
   onEdit,
   onBack,
+  onRollback,
 }: NoteViewProps) {
   const [showHistory, setShowHistory] = useState(false);
+  const [rollbackSuccess, setRollbackSuccess] = useState<string | null>(null);
   const speech = useSpeech();
+
+  const handleRollback = async (content: string, summary: string) => {
+    speech.stop();
+    if (onRollback) {
+      await onRollback(content, summary);
+      setRollbackSuccess(`ย้อนกลับเนื้อหาสำเร็จ (${summary})`);
+      setTimeout(() => setRollbackSuccess(null), 6000);
+    }
+  };
 
   if (loading) {
     return (
@@ -304,6 +487,15 @@ export function NoteView({
         </>
       }
     >
+      {rollbackSuccess && (
+        <div className="mb-5 flex items-center justify-between rounded border border-ok/30 bg-ok-soft px-4 py-3 text-sm text-ok">
+          <span>✅ {rollbackSuccess}</span>
+          <button onClick={() => setRollbackSuccess(null)} className="text-ok font-bold hover:opacity-80">
+            ×
+          </button>
+        </div>
+      )}
+
       <article className="rounded-sheet border border-paper-rule bg-white p-6 shadow-sheet sm:p-8">
         {speech.isPlaying && (
           <p className="mb-5 rounded border border-ok/25 bg-ok-soft px-3 py-2 text-sm text-ok">
@@ -314,7 +506,9 @@ export function NoteView({
           {note.content || "ไม่มีเนื้อหา"}
         </div>
       </article>
-      {showHistory && note.revisions && <RevisionList revisions={note.revisions} />}
+      {showHistory && note.revisions && (
+        <RevisionList revisions={note.revisions} onRollback={handleRollback} />
+      )}
     </PageShell>
   );
 }
