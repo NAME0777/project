@@ -106,6 +106,8 @@ export const api = {
 
   getNote: (noteId: number) => request<Note>(`/notes/${noteId}/`),
 
+  deleteNote: (noteId: number) => request<void>(`/notes/${noteId}/`, { method: "DELETE" }),
+
   getNotes: (params?: { subject?: number; hasFile?: boolean; search?: string }) => {
     const q = new URLSearchParams();
     if (params?.subject) q.set("subject", String(params.subject));

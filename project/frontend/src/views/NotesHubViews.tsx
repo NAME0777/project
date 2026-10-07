@@ -231,7 +231,8 @@ export function NotesHubView({
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {notes.map((note) => {
             const fileType = getFileType(note.source_file);
-            const uploader = note.revisions?.[0]?.editor_name || "นักศึกษา";
+            const author = note.author_name || note.revisions?.[note.revisions.length - 1]?.editor_name || "นักศึกษา";
+            const latestEditor = note.revisions?.[0]?.editor_name;
 
             return (
               <div
@@ -276,7 +277,12 @@ export function NotesHubView({
                 {/* Footer ข้อมูลวันที่และผู้แชร์ */}
                 <div className="mt-4 pt-3 border-t border-paper-rule flex items-center justify-between text-xs text-ink-mute">
                   <div className="flex items-center gap-1.5 truncate">
-                    <span className="font-medium text-ink truncate">{uploader}</span>
+                    <span className="font-medium text-ink truncate">โดย {author}</span>
+                    {latestEditor && latestEditor !== author && (
+                      <span className="text-[11px] text-ink-mute truncate hidden sm:inline">
+                        (แก้: {latestEditor})
+                      </span>
+                    )}
                     <span>·</span>
                     <span>{formatThaiDate(note.created_at)}</span>
                   </div>
@@ -503,6 +509,7 @@ interface NoteFileDetailViewProps {
   onNavigate: (view: ViewName) => void;
   onLogout: () => void;
   onBack: () => void;
+  onDelete?: (noteId: number) => Promise<void> | void;
 }
 
 export function NoteFileDetailView({
@@ -511,9 +518,13 @@ export function NoteFileDetailView({
   onNavigate,
   onLogout,
   onBack,
+  onDelete,
 }: NoteFileDetailViewProps) {
   const [note, setNote] = useState<Note | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!noteId) return;
@@ -559,10 +570,17 @@ export function NoteFileDetailView({
   }
 
   const fileType = getFileType(note.source_file);
-  const uploader = note.revisions?.[0]?.editor_name || "นักศึกษา";
+  const authorName = note.author_name || note.revisions?.[note.revisions.length - 1]?.editor_name || "ไม่ระบุผู้เขียน";
+  const lastEditorName = note.revisions?.[0]?.editor_name;
   const fileName = note.source_file
     ? decodeURIComponent(note.source_file.split("/").pop()?.split("?")[0] || "ไฟล์เอกสาร")
     : null;
+
+  const canDelete = Boolean(
+    user.role === "admin" ||
+      (note.author_id && note.author_id === user.id) ||
+      (note.author && note.author === user.id)
+  );
 
   return (
     <PageShell
@@ -572,31 +590,47 @@ export function NoteFileDetailView({
       onLogout={onLogout}
       width="wide"
       title={note.title}
-      description={`${note.subject_code ? `${note.subject_code} — ` : ""}แชร์โดย ${uploader} เมื่อ ${formatThaiDate(note.created_at)}`}
+      description={`${note.subject_code ? `${note.subject_code} — ` : ""}สร้างโดย ${authorName} เมื่อ ${formatThaiDate(note.created_at)}${
+        lastEditorName && lastEditorName !== authorName ? ` · แก้ไขล่าสุดโดย ${lastEditorName}` : ""
+      }`}
       breadcrumb={<BackLink label="กลับไปคลังโน้ตทั้งหมด" onClick={onBack} />}
       actions={
-        note.source_file ? (
-          <div className="flex items-center gap-2">
-            <a
-              href={note.source_file}
-              download
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-2 rounded bg-ink px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-ink-soft shadow-xs"
+        <div className="flex flex-wrap items-center gap-2">
+          {note.source_file && (
+            <>
+              <a
+                href={note.source_file}
+                download
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 rounded bg-ink px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-ink-soft shadow-xs"
+              >
+                <span>⬇ ดาวน์โหลดไฟล์</span>
+              </a>
+              <a
+                href={note.source_file}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 rounded border border-paper-rule bg-white px-3 py-2 text-sm font-medium text-ink hover:border-ink-mute transition-colors"
+              >
+                <span>เปิดแท็บใหม่</span>
+                <span aria-hidden>↗</span>
+              </a>
+            </>
+          )}
+          {canDelete && (
+            <Button
+              variant="quiet"
+              onClick={() => {
+                setDeleteError(null);
+                setShowDeleteModal(true);
+              }}
+              className="text-redpen border border-redpen/30 hover:bg-redpen-soft hover:border-redpen"
             >
-              <span>⬇ ดาวน์โหลดไฟล์</span>
-            </a>
-            <a
-              href={note.source_file}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1.5 rounded border border-paper-rule bg-white px-3 py-2 text-sm font-medium text-ink hover:border-ink-mute transition-colors"
-            >
-              <span>เปิดแท็บใหม่</span>
-              <span aria-hidden>↗</span>
-            </a>
-          </div>
-        ) : undefined
+              🗑 ลบโน้ต
+            </Button>
+          )}
+        </div>
       }
     >
       <div className="space-y-6">
@@ -677,6 +711,62 @@ export function NoteFileDetailView({
             </div>
           </div>
         )}
+
+        {/* Modal ยืนยันการลบโน้ต */}
+        <Modal
+          isOpen={showDeleteModal}
+          onClose={() => {
+            if (!isDeleting) {
+              setShowDeleteModal(false);
+              setDeleteError(null);
+            }
+          }}
+          title="ยืนยันการลบโน้ตสรุป"
+          description={`คุณต้องการลบโน้ต "${note.title}" ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้`}
+        >
+          <div className="space-y-4">
+            <div className="rounded border border-redpen/20 bg-redpen-soft p-3.5 text-xs text-redpen leading-relaxed">
+              ⚠️ <strong>คำเตือน:</strong> การลบโน้ตจะลบไฟล์แนบต้นฉบับและข้อมูลทั้งหมดออกจากระบบอย่างถาวร
+            </div>
+
+            {deleteError && (
+              <div className="rounded border border-redpen/30 bg-redpen-soft px-3 py-2 text-sm text-redpen">
+                {deleteError}
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2 border-t border-paper-rule pt-4">
+              <Button
+                type="button"
+                variant="quiet"
+                disabled={isDeleting}
+                onClick={() => setShowDeleteModal(false)}
+              >
+                ยกเลิก
+              </Button>
+              <Button
+                type="button"
+                disabled={isDeleting}
+                className="bg-redpen text-white hover:bg-red-700"
+                onClick={async () => {
+                  setIsDeleting(true);
+                  setDeleteError(null);
+                  try {
+                    await api.deleteNote(note.id);
+                    if (onDelete) await onDelete(note.id);
+                    setShowDeleteModal(false);
+                    onBack();
+                  } catch (err) {
+                    setDeleteError(err instanceof Error ? err.message : "ลบโน้ตไม่สำเร็จ");
+                    setIsDeleting(false);
+                  }
+                }}
+              >
+                {isDeleting ? "กำลังลบ…" : "ยืนยันลบโน้ต"}
+              </Button>
+            </div>
+          </div>
+        </Modal>
       </div>
     </PageShell>
   );

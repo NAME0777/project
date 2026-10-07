@@ -374,6 +374,7 @@ interface NoteViewProps {
   onEdit: () => void;
   onBack: () => void;
   onRollback?: (content: string, summary: string) => Promise<void>;
+  onDelete?: () => Promise<void> | void;
 }
 
 export function NoteView({
@@ -387,9 +388,13 @@ export function NoteView({
   onEdit,
   onBack,
   onRollback,
+  onDelete,
 }: NoteViewProps) {
   const [showHistory, setShowHistory] = useState(false);
   const [rollbackSuccess, setRollbackSuccess] = useState<string | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const speech = useSpeech();
 
   const handleRollback = async (content: string, summary: string) => {
@@ -449,7 +454,13 @@ export function NoteView({
     );
   }
 
+  const authorName = note.author_name || note.revisions?.[note.revisions.length - 1]?.editor_name || "ไม่ระบุผู้เขียน";
   const lastEdit = note.revisions && note.revisions.length > 0 ? note.revisions[0] : null;
+  const canDelete = Boolean(
+    user.role === "admin" ||
+      (note.author_id && note.author_id === user.id) ||
+      (note.author && note.author === user.id)
+  );
 
   return (
     <PageShell
@@ -459,9 +470,11 @@ export function NoteView({
       onLogout={onLogout}
       title={note.title}
       description={
-        lastEdit
-          ? `${subjectCode ?? ""} · แก้ไขล่าสุดโดย ${lastEdit.editor_name || "ไม่ทราบผู้แก้ไข"} เมื่อ ${formatThaiDate(lastEdit.created_at)}`
-          : subjectCode
+        `${subjectCode ? `${subjectCode} · ` : ""}เขียนโดย ${authorName}${
+          lastEdit
+            ? ` · แก้ไขล่าสุดโดย ${lastEdit.editor_name || "ไม่ทราบผู้แก้ไข"} (${formatThaiDate(lastEdit.created_at)})`
+            : ""
+        }`
       }
       breadcrumb={<BackLink label="หัวข้อบทเรียน" onClick={onBack} />}
       actions={
@@ -484,6 +497,19 @@ export function NoteView({
           >
             แก้ไขเนื้อหา
           </Button>
+          {canDelete && (
+            <Button
+              variant="quiet"
+              onClick={() => {
+                speech.stop();
+                setDeleteError(null);
+                setShowDeleteModal(true);
+              }}
+              className="text-redpen border border-redpen/30 hover:bg-redpen-soft hover:border-redpen"
+            >
+              🗑 ลบโน้ต
+            </Button>
+          )}
         </>
       }
     >
@@ -509,6 +535,60 @@ export function NoteView({
       {showHistory && note.revisions && (
         <RevisionList revisions={note.revisions} onRollback={handleRollback} />
       )}
+
+      {/* Modal ยืนยันการลบโน้ต */}
+      <Modal
+        isOpen={showDeleteModal}
+        onClose={() => {
+          if (!isDeleting) {
+            setShowDeleteModal(false);
+            setDeleteError(null);
+          }
+        }}
+        title="ยืนยันการลบโน้ตบทเรียน"
+        description={`คุณต้องการลบโน้ต "${note.title}" ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้`}
+      >
+        <div className="space-y-4">
+          <div className="rounded border border-redpen/20 bg-redpen-soft p-3.5 text-xs text-redpen leading-relaxed">
+            ⚠️ <strong>คำเตือน:</strong> การลบโน้ตจะทำให้หัวข้อนี้กลับไปอยู่ในสถานะยังไม่มีเนื้อหา และประวัติการแก้ไขทั้งหมดจะถูกลบ
+          </div>
+
+          {deleteError && (
+            <div className="rounded border border-redpen/30 bg-redpen-soft px-3 py-2 text-sm text-redpen">
+              {deleteError}
+            </div>
+          )}
+
+          <div className="flex items-center justify-end gap-2 border-t border-paper-rule pt-4">
+            <Button
+              type="button"
+              variant="quiet"
+              disabled={isDeleting}
+              onClick={() => setShowDeleteModal(false)}
+            >
+              ยกเลิก
+            </Button>
+            <Button
+              type="button"
+              disabled={isDeleting}
+              className="bg-redpen text-white hover:bg-red-700"
+              onClick={async () => {
+                setIsDeleting(true);
+                setDeleteError(null);
+                try {
+                  if (onDelete) await onDelete();
+                  setShowDeleteModal(false);
+                } catch (err) {
+                  setDeleteError(err instanceof Error ? err.message : "ลบโน้ตไม่สำเร็จ");
+                  setIsDeleting(false);
+                }
+              }}
+            >
+              {isDeleting ? "กำลังลบ…" : "ยืนยันลบโน้ต"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </PageShell>
   );
 }

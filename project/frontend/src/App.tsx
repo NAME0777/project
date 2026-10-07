@@ -93,6 +93,13 @@ export default function App() {
           onRollback={async (content, summary) => {
             await saveRevision(content, summary);
           }}
+          onDelete={async () => {
+            if (note) {
+              await api.deleteNote(note.id);
+              await catalog.reloadTopics?.();
+              back();
+            }
+          }}
         />
       );
     }

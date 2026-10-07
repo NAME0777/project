@@ -13,6 +13,13 @@ def note_attachment_path(instance, filename):
 
 class Note(models.Model):
     subject = models.ForeignKey("subjects.Subject", on_delete=models.CASCADE, related_name="notes")
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="notes",
+    )
     title = models.CharField(max_length=200)
     content = models.TextField()
     # ไฟล์ต้นฉบับ (PDF/รูปภาพที่ใช้ทำ OCR) — เก็บบน minIO เมื่อ USE_S3_STORAGE=True
