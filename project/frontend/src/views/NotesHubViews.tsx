@@ -20,6 +20,36 @@ function getFileType(url?: string | null): "pdf" | "image" | "none" {
   return "pdf";
 }
 
+// ---- Helper: ดาวน์โหลดไฟล์จริงลงเครื่องผ่าน Blob (ไม่เด้งเปิดแท็บใหม่) ----
+async function downloadFile(url: string, filename: string): Promise<void> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("ดาวน์โหลดไม่สำเร็จ");
+    const blob = await res.blob();
+    const blobUrl = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.style.display = "none";
+    a.href = blobUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(blobUrl);
+    }, 200);
+  } catch {
+    // Fallback: หาก fetch blob ข้าม Origin มีปัญหา ให้ fallback เปิดแท็บเพื่อดาวน์โหลด
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.target = "_blank";
+    a.rel = "noreferrer";
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => document.body.removeChild(a), 200);
+  }
+}
+
 // ---- NotesHubView: หน้ารวมการ์ดโน้ตทั้งหมด ----
 
 interface NotesHubViewProps {
@@ -28,6 +58,7 @@ interface NotesHubViewProps {
   onNavigate: (view: ViewName) => void;
   onLogout: () => void;
   onSelectNote: (noteId: number) => void;
+  onCreateSubject?: (subject: { code: string; name: string; term: string }) => Promise<Subject | void>;
 }
 
 export function NotesHubView({
@@ -36,11 +67,18 @@ export function NotesHubView({
   onNavigate,
   onLogout,
   onSelectNote,
+  onCreateSubject,
 }: NotesHubViewProps) {
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [selectedSubject, setSelectedSubject] = useState<number | "all">("all");
+
+  // Subject Modal State (สำหรับสร้างรายวิชาใหม่เมื่อกำลังอัปโหลด)
+  const [showSubjectModal, setShowSubjectModal] = useState(false);
+  const [subjectForm, setSubjectForm] = useState({ code: "", name: "", term: "" });
+  const [subjectModalError, setSubjectModalError] = useState<string | null>(null);
+  const [creatingSubject, setCreatingSubject] = useState(false);
 
   // Upload Modal State
   const [showModal, setShowModal] = useState(false);
@@ -59,6 +97,33 @@ export function NotesHubView({
       setUploadSubject(subjects[0].id);
     }
   }, [subjects, uploadSubject]);
+
+  const handleCreateSubjectSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!subjectForm.code.trim() || !subjectForm.name.trim() || !subjectForm.term.trim()) {
+      setSubjectModalError("กรุณากรอกข้อมูลให้ครบทุกช่อง");
+      return;
+    }
+    setCreatingSubject(true);
+    setSubjectModalError(null);
+    try {
+      let created: Subject | void;
+      if (onCreateSubject) {
+        created = await onCreateSubject(subjectForm);
+      } else {
+        created = await api.createSubject(subjectForm);
+      }
+      if (created && created.id) {
+        setUploadSubject(created.id);
+      }
+      setShowSubjectModal(false);
+      setSubjectForm({ code: "", name: "", term: "" });
+    } catch (err) {
+      setSubjectModalError(err instanceof Error ? err.message : "เพิ่มรายวิชาไม่สำเร็จ");
+    } finally {
+      setCreatingSubject(false);
+    }
+  };
 
   const loadNotes = async () => {
     setLoading(true);
@@ -286,9 +351,30 @@ export function NotesHubView({
                     <span>·</span>
                     <span>{formatThaiDate(note.created_at)}</span>
                   </div>
-                  <span className="text-pen font-medium group-hover:underline shrink-0">
-                    เปิดดู →
-                  </span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {note.source_file && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const fileUrl = note.source_file;
+                          if (!fileUrl) return;
+                          const targetName = decodeURIComponent(
+                            fileUrl.split("/").pop()?.split("?")[0] ||
+                              `${note.title.trim()}.${fileType === "pdf" ? "pdf" : "png"}`
+                          );
+                          downloadFile(fileUrl, targetName);
+                        }}
+                        title="ดาวน์โหลดไฟล์เอกสารลงเครื่อง"
+                        className="rounded border border-paper-rule bg-white px-2 py-0.5 text-[11px] font-medium text-ink hover:border-pen hover:text-pen hover:bg-paper transition-all"
+                      >
+                        โหลด
+                      </button>
+                    )}
+                    <span className="text-pen font-medium group-hover:underline">
+                      เปิดดู →
+                    </span>
+                  </div>
                 </div>
               </div>
             );
@@ -311,7 +397,20 @@ export function NotesHubView({
       >
         <form onSubmit={handleUploadSubmit} className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm text-ink-soft">รายวิชา *</label>
+            <div className="mb-1 flex items-center justify-between">
+              <label className="text-sm text-ink-soft">รายวิชา *</label>
+              <button
+                type="button"
+                onClick={() => {
+                  setSubjectModalError(null);
+                  setSubjectForm({ code: "", name: "", term: "" });
+                  setShowSubjectModal(true);
+                }}
+                className="text-xs text-pen hover:underline cursor-pointer font-medium"
+              >
+                + เพิ่มวิชาใหม่
+              </button>
+            </div>
             <select
               value={uploadSubject}
               onChange={(e) => setUploadSubject(Number(e.target.value))}
@@ -402,7 +501,7 @@ export function NotesHubView({
                   <div className="flex items-center justify-between text-xs text-ink-mute">
                     <span>
                       {uploadFiles.length > 1
-                        ? `📑 ลำดับหน้าในเล่ม (${uploadFiles.length} หน้า):`
+                        ? `ลำดับหน้าในเล่ม (${uploadFiles.length} หน้า):`
                         : "เอกสารที่เลือก:"}
                     </span>
                     <button
@@ -452,7 +551,6 @@ export function NotesHubView({
 
                   {uploadFiles.length > 1 && (
                     <div className="rounded bg-ok-soft/70 px-3 py-2 text-xs text-ok flex items-center gap-1.5 border border-ok/20">
-                      <span>✨</span>
                       <span>
                         ระบบจะแปลงและรวมทั้ง <strong>{uploadFiles.length} รูปภาพ</strong> เป็นไฟล์ PDF สรุปบทเรียน 1 เล่มให้อัตโนมัติ
                       </span>
@@ -462,7 +560,7 @@ export function NotesHubView({
               )}
 
               <p className="text-xs text-ink-mute">
-                💡 สามารถเลือกรูปภาพหลายรูปพร้อมกัน (Ctrl/Shift + คลิก) เพื่อรวมเป็นสมุดโน้ต PDF เล่มเดียว หรือเลือกไฟล์ PDF
+                สามารถเลือกรูปภาพหลายรูปพร้อมกัน (Ctrl/Shift + คลิก) เพื่อรวมเป็นสมุดโน้ต PDF เล่มเดียว หรือเลือกไฟล์ PDF
               </p>
             </div>
           </div>
@@ -497,6 +595,72 @@ export function NotesHubView({
           </div>
         </form>
       </Modal>
+
+      {/* Modal เพิ่มรายวิชาใหม่ */}
+      <Modal
+        isOpen={showSubjectModal}
+        onClose={() => {
+          if (!creatingSubject) {
+            setShowSubjectModal(false);
+            setSubjectModalError(null);
+          }
+        }}
+        title="เพิ่มรายวิชาใหม่"
+        description="สร้างรายวิชาสำหรับจัดหมวดหมู่โน้ตสรุปและเนื้อหาบทเรียน"
+      >
+        <form onSubmit={handleCreateSubjectSubmit} className="space-y-4">
+          <Field
+            label="รหัสวิชา *"
+            placeholder="เช่น CS999, 01006012"
+            value={subjectForm.code}
+            onChange={(e) =>
+              setSubjectForm((f) => ({ ...f, code: e.target.value }))
+            }
+            disabled={creatingSubject}
+            required
+          />
+          <Field
+            label="ชื่อวิชา *"
+            placeholder="เช่น โครงสร้างข้อมูล, ปัญญาประดิษฐ์"
+            value={subjectForm.name}
+            onChange={(e) =>
+              setSubjectForm((f) => ({ ...f, name: e.target.value }))
+            }
+            disabled={creatingSubject}
+            required
+          />
+          <Field
+            label="ภาคการศึกษา *"
+            placeholder="เช่น 1/2569"
+            value={subjectForm.term}
+            onChange={(e) =>
+              setSubjectForm((f) => ({ ...f, term: e.target.value }))
+            }
+            disabled={creatingSubject}
+            required
+          />
+
+          {subjectModalError && (
+            <div className="rounded border border-redpen/30 bg-redpen-soft px-3 py-2 text-sm text-redpen">
+              {subjectModalError}
+            </div>
+          )}
+
+          <div className="flex items-center justify-end gap-2 border-t border-paper-rule pt-4">
+            <Button
+              type="button"
+              variant="quiet"
+              disabled={creatingSubject}
+              onClick={() => setShowSubjectModal(false)}
+            >
+              ยกเลิก
+            </Button>
+            <Button type="submit" disabled={creatingSubject}>
+              {creatingSubject ? "กำลังบันทึก…" : "บันทึกรายวิชา"}
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </PageShell>
   );
 }
@@ -525,6 +689,16 @@ export function NoteFileDetailView({
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  // State สำหรับการแก้ไขข้อมูลโน้ต
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editContent, setEditContent] = useState("");
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+
+  // State สำหรับการดาวน์โหลดไฟล์ลงเครื่อง
+  const [isDownloading, setIsDownloading] = useState(false);
 
   useEffect(() => {
     if (!noteId) return;
@@ -576,11 +750,60 @@ export function NoteFileDetailView({
     ? decodeURIComponent(note.source_file.split("/").pop()?.split("?")[0] || "ไฟล์เอกสาร")
     : null;
 
+  // ตรวจสอบสิทธิ์ Author หรือ Admin
+  const canEdit = Boolean(
+    user.role === "admin" ||
+      (note.author_id && note.author_id === user.id) ||
+      (note.author && note.author === user.id)
+  );
+
   const canDelete = Boolean(
     user.role === "admin" ||
       (note.author_id && note.author_id === user.id) ||
       (note.author && note.author === user.id)
   );
+
+  const handleOpenEdit = () => {
+    setEditTitle(note.title);
+    setEditContent(note.content || "");
+    setEditError(null);
+    setShowEditModal(true);
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editTitle.trim()) {
+      setEditError("กรุณาระบุชื่อโน้ตสรุป");
+      return;
+    }
+    setIsSavingEdit(true);
+    setEditError(null);
+    try {
+      const updated = await api.updateNote(note.id, {
+        title: editTitle.trim(),
+        content: editContent,
+        summary: "แก้ไขข้อมูลโน้ต",
+      });
+      setNote(updated);
+      setShowEditModal(false);
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : "บันทึกการแก้ไขไม่สำเร็จ");
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const handleDownload = async () => {
+    if (!note.source_file || isDownloading) return;
+    setIsDownloading(true);
+    const targetName =
+      fileName || `${note.title.trim()}.${fileType === "pdf" ? "pdf" : "png"}`;
+    try {
+      await downloadFile(note.source_file, targetName);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   return (
     <PageShell
@@ -598,15 +821,13 @@ export function NoteFileDetailView({
         <div className="flex flex-wrap items-center gap-2">
           {note.source_file && (
             <>
-              <a
-                href={note.source_file}
-                download
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-2 rounded bg-ink px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-ink-soft shadow-xs"
+              <Button
+                onClick={handleDownload}
+                disabled={isDownloading}
+                className="shadow-xs"
               >
-                <span>⬇ ดาวน์โหลดไฟล์</span>
-              </a>
+                <span>{isDownloading ? "กำลังดาวน์โหลด…" : "ดาวน์โหลดไฟล์"}</span>
+              </Button>
               <a
                 href={note.source_file}
                 target="_blank"
@@ -618,6 +839,15 @@ export function NoteFileDetailView({
               </a>
             </>
           )}
+          {canEdit && (
+            <Button
+              variant="quiet"
+              onClick={handleOpenEdit}
+              className="border border-paper-rule text-ink hover:border-pen hover:text-pen"
+            >
+              แก้ไขข้อมูล
+            </Button>
+          )}
           {canDelete && (
             <Button
               variant="quiet"
@@ -627,7 +857,7 @@ export function NoteFileDetailView({
               }}
               className="text-redpen border border-redpen/30 hover:bg-redpen-soft hover:border-redpen"
             >
-              🗑 ลบโน้ต
+              ลบโน้ต
             </Button>
           )}
         </div>
@@ -646,15 +876,14 @@ export function NoteFileDetailView({
                 <p className="text-xs text-ink-mute">คลิกดาวน์โหลดหรือเปิดดูเนื้อหาในเอกสารด้านล่าง</p>
               </div>
             </div>
-            <a
-              href={note.source_file}
-              download
-              target="_blank"
-              rel="noreferrer"
-              className="text-xs font-semibold text-pen hover:underline"
+            <button
+              type="button"
+              onClick={handleDownload}
+              disabled={isDownloading}
+              className="text-xs font-semibold text-pen hover:underline cursor-pointer disabled:opacity-50"
             >
-              ดาวน์โหลดทันที ↗
-            </a>
+              {isDownloading ? "กำลังดาวน์โหลด…" : "ดาวน์โหลดลงเครื่อง"}
+            </button>
           </div>
         ) : (
           <div className="rounded-sheet border border-dashed border-paper-rule bg-white p-4 text-xs text-ink-soft">
@@ -666,8 +895,29 @@ export function NoteFileDetailView({
         {note.source_file && (
           <div className="overflow-hidden rounded-sheet border border-paper-rule bg-white shadow-sheet">
             <div className="border-b border-paper-rule bg-paper/60 px-4 py-2.5 flex items-center justify-between text-xs text-ink-soft font-medium">
-              <span>ตัวอย่างเอกสาร (Preview)</span>
-              <span>{fileName}</span>
+              <div className="flex items-center gap-2">
+                <span>ตัวอย่างเอกสาร (Preview)</span>
+                <span className="text-ink-mute">·</span>
+                <span className="font-semibold text-ink">{fileName}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleDownload}
+                  disabled={isDownloading}
+                  className="text-pen hover:underline font-semibold"
+                >
+                  โหลดไฟล์
+                </button>
+                <a
+                  href={note.source_file}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-ink hover:text-pen"
+                >
+                  เปิดแท็บใหม่ ↗
+                </a>
+              </div>
             </div>
 
             {fileType === "pdf" ? (
@@ -689,28 +939,93 @@ export function NoteFileDetailView({
             ) : (
               <div className="p-8 text-center text-sm text-ink-soft">
                 <p>ไฟล์นี้ไม่รองรับการแสดงตัวอย่างในเบราว์เซอร์</p>
-                <a
-                  href={note.source_file}
-                  target="_blank"
-                  rel="noreferrer"
+                <button
+                  type="button"
+                  onClick={handleDownload}
+                  disabled={isDownloading}
                   className="mt-3 inline-block rounded bg-ink px-4 py-2 text-xs font-medium text-paper"
                 >
-                  คลิกเพื่อดาวน์โหลดไฟล์
-                </a>
+                  {isDownloading ? "กำลังดาวน์โหลด…" : "คลิกเพื่อดาวน์โหลดไฟล์"}
+                </button>
               </div>
             )}
           </div>
         )}
 
         {/* คำอธิบายและเนื้อหาโน้ตย่อ */}
-        {note.content && (
-          <div className="rounded-sheet border border-paper-rule bg-white p-6 shadow-sheet">
-            <h2 className="text-base font-semibold text-ink mb-2">คำอธิบายและเนื้อหาโน้ตย่อ</h2>
-            <div className="whitespace-pre-line text-sm leading-relaxed text-ink-soft">
-              {note.content}
-            </div>
+        <div className="rounded-sheet border border-paper-rule bg-white p-6 shadow-sheet">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-base font-semibold text-ink">คำอธิบายและเนื้อหาโน้ตย่อ</h2>
+            {canEdit && (
+              <button
+                type="button"
+                onClick={handleOpenEdit}
+                className="text-xs font-medium text-pen hover:underline"
+              >
+                แก้ไขคำอธิบาย
+              </button>
+            )}
           </div>
-        )}
+          <div className="whitespace-pre-line text-sm leading-relaxed text-ink-soft">
+            {note.content || "ไม่มีคำอธิบายเพิ่มเติม"}
+          </div>
+        </div>
+
+        {/* Modal แก้ไขข้อมูลโน้ต */}
+        <Modal
+          isOpen={showEditModal}
+          onClose={() => {
+            if (!isSavingEdit) {
+              setShowEditModal(false);
+              setEditError(null);
+            }
+          }}
+          title="แก้ไขข้อมูลโน้ตสรุป"
+          description="แก้ไขชื่อโน้ตและคำอธิบายสรุปบทเรียน"
+        >
+          <form onSubmit={handleSaveEdit} className="space-y-4">
+            <Field
+              label="ชื่อโน้ตสรุป *"
+              placeholder="ระบุชื่อโน้ตสรุป..."
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              disabled={isSavingEdit}
+              required
+            />
+
+            <TextAreaField
+              label="คำอธิบายสรุป / ประเด็นสำคัญ"
+              placeholder="เขียนคำอธิบายเกี่ยวกับโน้ตชุดนี้ เช่น จุดที่เน้นออกสอบ..."
+              className="h-36"
+              value={editContent}
+              onChange={(e) => setEditContent(e.target.value)}
+              disabled={isSavingEdit}
+            />
+
+            {editError && (
+              <div className="rounded border border-redpen/30 bg-redpen-soft px-3 py-2 text-sm text-redpen">
+                {editError}
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2 border-t border-paper-rule pt-4">
+              <Button
+                type="button"
+                variant="quiet"
+                disabled={isSavingEdit}
+                onClick={() => setShowEditModal(false)}
+              >
+                ยกเลิก
+              </Button>
+              <Button
+                type="submit"
+                disabled={isSavingEdit || !editTitle.trim()}
+              >
+                {isSavingEdit ? "กำลังบันทึก…" : "บันทึกการแก้ไข"}
+              </Button>
+            </div>
+          </form>
+        </Modal>
 
         {/* Modal ยืนยันการลบโน้ต */}
         <Modal
@@ -726,7 +1041,7 @@ export function NoteFileDetailView({
         >
           <div className="space-y-4">
             <div className="rounded border border-redpen/20 bg-redpen-soft p-3.5 text-xs text-redpen leading-relaxed">
-              ⚠️ <strong>คำเตือน:</strong> การลบโน้ตจะลบไฟล์แนบต้นฉบับและข้อมูลทั้งหมดออกจากระบบอย่างถาวร
+              <strong>คำเตือน:</strong> การลบโน้ตจะลบไฟล์แนบต้นฉบับและข้อมูลทั้งหมดออกจากระบบอย่างถาวร
             </div>
 
             {deleteError && (
