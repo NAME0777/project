@@ -18,7 +18,7 @@ interface SubjectsViewProps {
   onNavigate: (view: ViewName) => void;
   onLogout: () => void;
   onOpenSubject: (subjectId: number) => void;
-  onCreateSubject: (subject: { code: string; name: string; term: string }) => Promise<void>;
+  onCreateSubject?: (subject: { code: string; name: string; term: string }) => Promise<Subject | void>;
   onDeleteSubject: (id: number) => Promise<void>;
 }
 
@@ -47,7 +47,9 @@ export function SubjectsView({
     setError(null);
     setSaving(true);
     try {
-      await onCreateSubject(form);
+      if (onCreateSubject) {
+        await onCreateSubject(form);
+      }
       setForm({ code: "", name: "", term: "" });
       setShowForm(false);
     } catch (err) {
@@ -84,12 +86,33 @@ export function SubjectsView({
     >
       {showForm && (
         <div className="mb-5 grid gap-3 rounded-sheet border border-paper-rule bg-white p-5 shadow-sheet sm:grid-cols-3">
-          <Field label="รหัสวิชา" placeholder="CS999" value={form.code} onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))} />
-          <Field label="ชื่อวิชา" placeholder="ชื่อวิชาใหม่" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
-          <Field label="ภาคการศึกษา" placeholder="1/2569" value={form.term} onChange={(e) => setForm((f) => ({ ...f, term: e.target.value }))} />
-          {error && <p className="sm:col-span-3 rounded border border-redpen/30 bg-redpen-soft px-3 py-2 text-sm text-redpen">{error}</p>}
+          <Field
+            label="รหัสวิชา"
+            placeholder="CS999"
+            value={form.code}
+            onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
+          />
+          <Field
+            label="ชื่อวิชา"
+            placeholder="ชื่อวิชาใหม่"
+            value={form.name}
+            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+          />
+          <Field
+            label="ภาคการศึกษา"
+            placeholder="1/2569"
+            value={form.term}
+            onChange={(e) => setForm((f) => ({ ...f, term: e.target.value }))}
+          />
+          {error && (
+            <p className="sm:col-span-3 rounded border border-redpen/30 bg-redpen-soft px-3 py-2 text-sm text-redpen">
+              {error}
+            </p>
+          )}
           <div className="sm:col-span-3">
-            <Button onClick={submit} disabled={saving}>{saving ? "กำลังบันทึก…" : "บันทึกรายวิชา"}</Button>
+            <Button onClick={submit} disabled={saving}>
+              {saving ? "กำลังบันทึก…" : "บันทึกรายวิชา"}
+            </Button>
           </div>
         </div>
       )}
@@ -131,7 +154,8 @@ interface TopicsViewProps {
   loading: boolean;
   onNavigate: (view: ViewName) => void;
   onLogout: () => void;
-  onOpenNote: (topicId: number, noteId: number | null) => void;
+  onOpenNote: (topicId: number, noteId: number | null, hasNote?: boolean) => void;
+  onWriteWiki?: () => void;
   onBack: () => void;
   onCreateTopic: (subject: number, order: number, title: string) => Promise<void>;
   onUpdateTopic: (id: number, title: string) => Promise<void>;
@@ -146,6 +170,7 @@ export function TopicsView({
   onNavigate,
   onLogout,
   onOpenNote,
+  onWriteWiki,
   onBack,
   onCreateTopic,
   onUpdateTopic,
@@ -232,9 +257,14 @@ export function TopicsView({
       breadcrumb={<BackLink label="รายวิชาทั้งหมด" onClick={onBack} />}
       actions={
         subject ? (
-          <Button variant="quiet" onClick={() => setShowForm((v) => !v)}>
-            {showForm ? "ยกเลิก" : "+ เพิ่มหัวข้อบทเรียน"}
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button onClick={() => onWriteWiki?.()}>
+              + เขียนวิกิบทเรียน
+            </Button>
+            <Button variant="quiet" onClick={() => setShowForm((v) => !v)}>
+              {showForm ? "ยกเลิก" : "+ เพิ่มเฉพาะหัวข้อ"}
+            </Button>
+          </div>
         ) : undefined
       }
     >
@@ -287,42 +317,45 @@ export function TopicsView({
               ) : (
                 <>
                   <button
-                    onClick={() => onOpenNote(topic.id, topic.note_id)}
+                    onClick={() => onOpenNote(topic.id, topic.note_id, topic.has_note)}
                     className="flex flex-1 items-center gap-4 text-left hover:opacity-80"
                   >
-                      <span className="text-ink font-medium">{topic.title}</span>
-                      <span className={`ml-auto shrink-0 text-sm ${topic.has_note ? "text-pen font-medium" : "text-ink-mute"}`}>
-                        {topic.has_note ? "อ่านโน้ต" : "ยังไม่มีใครเขียน (คลิกเพื่อเริ่มเขียน)"}
-                      </span>
-                    </button>
+                    <span className="text-ink font-medium">{topic.title}</span>
+                    <span className={`ml-auto shrink-0 text-sm ${topic.has_note ? "text-pen font-medium" : "text-pen font-medium underline"}`}>
+                      {topic.has_note ? "อ่านวิกิ →" : "เขียนวิกิหัวข้อนี้ →"}
+                    </span>
+                  </button>
 
-                    {isAdmin && (
-                      <div className="flex shrink-0 items-center gap-1">
-                        <button
-                          onClick={() => startEdit(topic)}
-                          className="rounded px-2 py-1 text-xs text-pen hover:bg-paper-rule"
-                        >
-                          แก้ไขหัวข้อ
-                        </button>
-                        <button
-                          onClick={() => remove(topic.id, topic.title)}
-                          disabled={deletingId === topic.id}
-                          className="rounded px-2 py-1 text-xs text-redpen hover:bg-redpen-soft disabled:opacity-50"
-                        >
-                          {deletingId === topic.id ? "กำลังลบ…" : "ลบ"}
-                        </button>
-                      </div>
-                    )}
-                  </>
-                )}
-              </li>
-            ))}
-          </ol>
+                  {isAdmin && (
+                    <div className="flex shrink-0 items-center gap-1">
+                      <button
+                        onClick={() => startEdit(topic)}
+                        className="rounded px-2 py-1 text-xs text-pen hover:bg-paper-rule"
+                      >
+                        แก้ไขหัวข้อ
+                      </button>
+                      <button
+                        onClick={() => remove(topic.id, topic.title)}
+                        disabled={deletingId === topic.id}
+                        className="rounded px-2 py-1 text-xs text-redpen hover:bg-redpen-soft disabled:opacity-50"
+                      >
+                        {deletingId === topic.id ? "กำลังลบ…" : "ลบ"}
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </li>
+          ))}
+        </ol>
       )}
       {!loading && topics.length === 0 && (
-        <p className="rounded-sheet border border-dashed border-paper-rule p-8 text-center text-ink-soft">
-          วิชานี้ยังไม่มีหัวข้อบทเรียน เริ่มด้วยการเพิ่มหัวข้อใหม่ได้เลย
-        </p>
+        <div className="rounded-sheet border border-dashed border-paper-rule p-8 text-center text-ink-soft">
+          <p className="mb-4">วิชานี้ยังไม่มีหัวข้อบทเรียน</p>
+          <Button onClick={() => onWriteWiki?.()}>
+            + เริ่มเขียนวิกิบทเรียนแรก
+          </Button>
+        </div>
       )}
     </PageShell>
   );

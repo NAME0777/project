@@ -121,6 +121,9 @@ SIMPLE_JWT = {
 
 CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=["http://localhost:5173"])
 
+# อนุญาตให้ iframe ในหน้าเว็บเดียวกัน/ต้นทางเดียวกันสามารถพรีวิวเอกสาร PDF ได้โดยไม่ถูกบล็อก
+X_FRAME_OPTIONS = "SAMEORIGIN"
+
 # ---- ไฟล์แนบ (โน้ต/รูปสแกน) — เก็บบนดิสก์ตอน dev, สลับเป็น minIO ได้ทันทีตอน deploy ----
 
 USE_S3_STORAGE = env.bool("USE_S3_STORAGE", default=False)

@@ -27,7 +27,11 @@ export function useRouter(initial: Route = { name: "login" }) {
     setStack((prev) => (prev.length > 1 ? prev.slice(0, -1) : prev));
   }, []);
 
-  return { route, go, reset, back, canGoBack: stack.length > 1 };
+  const replace = useCallback((name: ViewName, params: Omit<Route, "name"> = {}) => {
+    setStack((prev) => (prev.length > 0 ? [...prev.slice(0, -1), { name, ...params }] : [{ name, ...params }]));
+  }, []);
+
+  return { route, go, reset, back, replace, canGoBack: stack.length > 1 };
 }
 
 // ---- useAuth ------------------------------------------------------------------
@@ -127,8 +131,9 @@ export function useCatalog(subjectId: number | undefined) {
 
   const createSubject = useCallback(
     async (subject: { code: string; name: string; term: string }) => {
-      await api.createSubject(subject);
+      const created = await api.createSubject(subject);
       await reloadSubjects();
+      return created;
     },
     [reloadSubjects]
   );

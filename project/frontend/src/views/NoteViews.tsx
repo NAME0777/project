@@ -421,7 +421,7 @@ export function NoteView({
     );
   }
 
-  // **จุดที่แก้ไข**: หากยังไม่มีโน้ต ให้แสดง UI แนะนำและปุ่มกดเพื่อสร้างโน้ตใหม่
+  // หากยังไม่มีโน้ต ให้แสดง UI แนะนำและปุ่มกดเพื่อสร้างวิกิใหม่
   if (!note) {
     return (
       <PageShell
@@ -429,7 +429,7 @@ export function NoteView({
         current="note"
         onNavigate={onNavigate}
         onLogout={onLogout}
-        title={topicTitle || "ยังไม่มีโน้ตสำหรับหัวข้อนี้"}
+        title={topicTitle || "ยังไม่มีวิกิสำหรับหัวข้อนี้"}
         description={
           subjectCode
             ? `${subjectCode} · ยังไม่มีการสร้างเนื้อหาในหัวข้อนี้`
@@ -438,16 +438,16 @@ export function NoteView({
         breadcrumb={<BackLink label="หัวข้อบทเรียน" onClick={onBack} />}
         actions={
           <Button onClick={onEdit}>
-            + สร้างโน้ตใหม่
+            + เขียนวิกิสำหรับหัวข้อนี้
           </Button>
         }
       >
         <div className="rounded-sheet border border-dashed border-paper-rule bg-white p-12 text-center shadow-sheet">
           <p className="mb-4 text-base text-ink-soft">
-            ยังไม่มีเนื้อหาในหัวข้อนี้ คลิกปุ่มด้านล่างเพื่อเริ่มเขียนโน้ต
+            ยังไม่มีเนื้อหาในหัวข้อนี้ คลิกปุ่มด้านล่างเพื่อเริ่มเขียนวิกิ
           </p>
           <Button onClick={onEdit}>
-            เริ่มเขียนโน้ต
+            เริ่มเขียนวิกิ
           </Button>
         </div>
       </PageShell>
@@ -515,7 +515,7 @@ export function NoteView({
     >
       {rollbackSuccess && (
         <div className="mb-5 flex items-center justify-between rounded border border-ok/30 bg-ok-soft px-4 py-3 text-sm text-ok">
-          <span>✅ {rollbackSuccess}</span>
+          <span>{rollbackSuccess}</span>
           <button onClick={() => setRollbackSuccess(null)} className="text-ok font-bold hover:opacity-80">
             ×
           </button>
@@ -550,7 +550,7 @@ export function NoteView({
       >
         <div className="space-y-4">
           <div className="rounded border border-redpen/20 bg-redpen-soft p-3.5 text-xs text-redpen leading-relaxed">
-            ⚠️ <strong>คำเตือน:</strong> การลบโน้ตจะทำให้หัวข้อนี้กลับไปอยู่ในสถานะยังไม่มีเนื้อหา และประวัติการแก้ไขทั้งหมดจะถูกลบ
+            <strong>คำเตือน:</strong> การลบโน้ตจะทำให้หัวข้อนี้กลับไปอยู่ในสถานะยังไม่มีเนื้อหา และประวัติการแก้ไขทั้งหมดจะถูกลบ
           </div>
 
           {deleteError && (
@@ -614,8 +614,8 @@ export function EditorView({
   onSave,
   onCancel,
 }: EditorViewProps) {
-  // หากไม่มี note ให้ตั้งค่าเริ่มต้นจาก defaultTitle หรือคำว่า "หัวข้อใหม่"
-  const [title, setTitle] = useState(note?.title ?? defaultTitle ?? "หัวข้อใหม่");
+  // หากไม่มี note ให้ตั้งค่าเริ่มต้นจาก defaultTitle หรือค่าว่าง
+  const [title, setTitle] = useState(note?.title ?? defaultTitle ?? "");
   const [content, setContent] = useState(note?.content ?? "");
   const [summary, setSummary] = useState(note ? "" : "สร้างโน้ตใหม่");
 
@@ -631,21 +631,22 @@ export function EditorView({
       current="editor"
       onNavigate={onNavigate}
       onLogout={onLogout}
-      title={isNew ? `สร้างโน้ตใหม่: ${title}` : `แก้ไข: ${note?.title ?? "โน้ต"}`}
-      description={isNew ? "สร้างเนื้อหาโน้ตใหม่สำหรับหัวข้อนี้" : "การแก้ไขจะถูกเก็บเป็นเวอร์ชันใหม่ ไม่ทับเนื้อหาเดิม"}
-      breadcrumb={<BackLink label="กลับไปอ่านโน้ต (ไม่บันทึก)" onClick={onCancel} />}
+      title={isNew ? (title.trim() ? `สร้างวิกิ: ${title}` : "สร้างวิกิบทเรียนใหม่") : `แก้ไข: ${note?.title ?? "โน้ต"}`}
+      description={isNew ? "สร้างหัวข้อและเนื้อหาสำหรับวิกิบทเรียนนี้" : "การแก้ไขจะถูกเก็บเป็นเวอร์ชันใหม่ ไม่ทับเนื้อหาเดิม"}
+      breadcrumb={<BackLink label={isNew ? "กลับไปหัวข้อบทเรียน (ไม่บันทึก)" : "กลับไปอ่านวิกิ (ไม่บันทึก)"} onClick={onCancel} />}
     >
       <div className="space-y-4 rounded-sheet border border-paper-rule bg-white p-6 shadow-sheet">
         {/* ช่องสำหรับแก้ไขชื่อหัวข้อบทเรียน */}
         <Field
-          label="หัวข้อบทเรียน"
-          placeholder="ระบุหัวข้อบทเรียน..."
+          label="หัวข้อบทเรียน *"
+          placeholder="ระบุหัวข้อบทเรียน เช่น บทนำ, สรุปสัปดาห์ที่ 1..."
           value={title}
           onChange={(e) => setTitle(e.target.value)}
         />
         {/* ช่องแก้ไขเนื้อหาโน้ต */}
         <TextAreaField
-          label="เนื้อหาโน้ต"
+          label="เนื้อหาวิกิบทเรียน *"
+          placeholder="เขียนเนื้อหา คำอธิบาย หรือสรุปบทเรียนที่นี่..."
           className="h-72"
           value={content}
           onChange={(e) => setContent(e.target.value)}
