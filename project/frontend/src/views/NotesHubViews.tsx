@@ -247,17 +247,17 @@ export function NotesHubView({
                     </span>
                     {fileType === "pdf" && (
                       <span className="flex items-center gap-1 rounded bg-red-100 text-red-700 px-2 py-0.5 text-[11px] font-bold tracking-wider">
-                        📄 PDF
+                        PDF
                       </span>
                     )}
                     {fileType === "image" && (
                       <span className="flex items-center gap-1 rounded bg-blue-100 text-blue-700 px-2 py-0.5 text-[11px] font-bold tracking-wider">
-                        🖼️ IMAGE
+                        IMAGE
                       </span>
                     )}
                     {fileType === "none" && (
                       <span className="rounded bg-paper-rule text-ink-mute px-2 py-0.5 text-[11px]">
-                        📝 สรุป
+                        สรุป
                       </span>
                     )}
                   </div>

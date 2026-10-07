@@ -96,7 +96,7 @@ function RevisionList({ revisions, onRollback }: RevisionListProps) {
               ))}
             </select>
             <Button variant="quiet" className="px-2.5 py-1 text-xs" onClick={handleCustomCompare}>
-              🔍 ดู Diff
+              เปรียบเทียบ
             </Button>
           </div>
         )}
@@ -140,7 +140,7 @@ function RevisionList({ revisions, onRollback }: RevisionListProps) {
                       onClick={() => setPreviewModal({ open: true, rev: revision, versionIndex: versionNumber })}
                       className="inline-flex items-center gap-1 rounded border border-paper-rule bg-paper px-2 py-1 text-xs font-medium text-ink hover:bg-paper-rule/60 transition-colors"
                     >
-                      <span>👁️ ดูเนื้อหา</span>
+                      <span>ดูเนื้อหา</span>
                     </button>
                   )}
 
@@ -149,7 +149,7 @@ function RevisionList({ revisions, onRollback }: RevisionListProps) {
                       onClick={() => openDiff(prevRevision, revision)}
                       className="inline-flex items-center gap-1 rounded border border-paper-rule bg-paper px-2 py-1 text-xs font-medium text-pen hover:bg-paper-rule/60 transition-colors"
                     >
-                      <span>🔍 ดู Diff</span>
+                      <span>เปรียบเทียบ</span>
                     </button>
                   )}
 
@@ -165,7 +165,7 @@ function RevisionList({ revisions, onRollback }: RevisionListProps) {
                       }
                       className="inline-flex items-center gap-1 rounded border border-pen/30 bg-pen/5 px-2.5 py-1 text-xs font-medium text-pen hover:bg-pen/15 transition-colors"
                     >
-                      <span>⏪ ย้อนกลับเป็นเวอร์ชันนี้</span>
+                      <span>ย้อนกลับเป็นเวอร์ชันนี้</span>
                     </button>
                   )}
                 </div>

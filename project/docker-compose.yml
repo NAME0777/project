@@ -48,7 +48,7 @@ services:
         condition: service_healthy
 
   minio:
-    image: minio/minio:latest
+    image: cgr.dev/chainguard/minio:latest
     restart: unless-stopped
     command: server /data --console-address :9001
     environment:
@@ -60,7 +60,7 @@ services:
     volumes:
       - minio-data:/data
 
-  backend:
+  backend: 
     build: ./backend
     restart: unless-stopped
     environment:
