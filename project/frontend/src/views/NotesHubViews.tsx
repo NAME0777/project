@@ -58,6 +58,7 @@ interface NotesHubViewProps {
   onNavigate: (view: ViewName) => void;
   onLogout: () => void;
   onSelectNote: (noteId: number) => void;
+  onCreateSubject?: (subject: { code: string; name: string; term: string }) => Promise<Subject | void>;
 }
 
 export function NotesHubView({
@@ -66,11 +67,18 @@ export function NotesHubView({
   onNavigate,
   onLogout,
   onSelectNote,
+  onCreateSubject,
 }: NotesHubViewProps) {
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [selectedSubject, setSelectedSubject] = useState<number | "all">("all");
+
+  // Subject Modal State (สำหรับสร้างรายวิชาใหม่เมื่อกำลังอัปโหลด)
+  const [showSubjectModal, setShowSubjectModal] = useState(false);
+  const [subjectForm, setSubjectForm] = useState({ code: "", name: "", term: "" });
+  const [subjectModalError, setSubjectModalError] = useState<string | null>(null);
+  const [creatingSubject, setCreatingSubject] = useState(false);
 
   // Upload Modal State
   const [showModal, setShowModal] = useState(false);
@@ -89,6 +97,33 @@ export function NotesHubView({
       setUploadSubject(subjects[0].id);
     }
   }, [subjects, uploadSubject]);
+
+  const handleCreateSubjectSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!subjectForm.code.trim() || !subjectForm.name.trim() || !subjectForm.term.trim()) {
+      setSubjectModalError("กรุณากรอกข้อมูลให้ครบทุกช่อง");
+      return;
+    }
+    setCreatingSubject(true);
+    setSubjectModalError(null);
+    try {
+      let created: Subject | void;
+      if (onCreateSubject) {
+        created = await onCreateSubject(subjectForm);
+      } else {
+        created = await api.createSubject(subjectForm);
+      }
+      if (created && created.id) {
+        setUploadSubject(created.id);
+      }
+      setShowSubjectModal(false);
+      setSubjectForm({ code: "", name: "", term: "" });
+    } catch (err) {
+      setSubjectModalError(err instanceof Error ? err.message : "เพิ่มรายวิชาไม่สำเร็จ");
+    } finally {
+      setCreatingSubject(false);
+    }
+  };
 
   const loadNotes = async () => {
     setLoading(true);
@@ -362,7 +397,20 @@ export function NotesHubView({
       >
         <form onSubmit={handleUploadSubmit} className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm text-ink-soft">รายวิชา *</label>
+            <div className="mb-1 flex items-center justify-between">
+              <label className="text-sm text-ink-soft">รายวิชา *</label>
+              <button
+                type="button"
+                onClick={() => {
+                  setSubjectModalError(null);
+                  setSubjectForm({ code: "", name: "", term: "" });
+                  setShowSubjectModal(true);
+                }}
+                className="text-xs text-pen hover:underline cursor-pointer font-medium"
+              >
+                + เพิ่มวิชาใหม่
+              </button>
+            </div>
             <select
               value={uploadSubject}
               onChange={(e) => setUploadSubject(Number(e.target.value))}
@@ -543,6 +591,72 @@ export function NotesHubView({
               disabled={uploading || !uploadTitle.trim() || uploadFiles.length === 0}
             >
               {uploading ? (progressText || "กำลังบันทึกและอัปโหลด…") : "บันทึกและอัปโหลด"}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Modal เพิ่มรายวิชาใหม่ */}
+      <Modal
+        isOpen={showSubjectModal}
+        onClose={() => {
+          if (!creatingSubject) {
+            setShowSubjectModal(false);
+            setSubjectModalError(null);
+          }
+        }}
+        title="เพิ่มรายวิชาใหม่"
+        description="สร้างรายวิชาสำหรับจัดหมวดหมู่โน้ตสรุปและเนื้อหาบทเรียน"
+      >
+        <form onSubmit={handleCreateSubjectSubmit} className="space-y-4">
+          <Field
+            label="รหัสวิชา *"
+            placeholder="เช่น CS999, 01006012"
+            value={subjectForm.code}
+            onChange={(e) =>
+              setSubjectForm((f) => ({ ...f, code: e.target.value }))
+            }
+            disabled={creatingSubject}
+            required
+          />
+          <Field
+            label="ชื่อวิชา *"
+            placeholder="เช่น โครงสร้างข้อมูล, ปัญญาประดิษฐ์"
+            value={subjectForm.name}
+            onChange={(e) =>
+              setSubjectForm((f) => ({ ...f, name: e.target.value }))
+            }
+            disabled={creatingSubject}
+            required
+          />
+          <Field
+            label="ภาคการศึกษา *"
+            placeholder="เช่น 1/2569"
+            value={subjectForm.term}
+            onChange={(e) =>
+              setSubjectForm((f) => ({ ...f, term: e.target.value }))
+            }
+            disabled={creatingSubject}
+            required
+          />
+
+          {subjectModalError && (
+            <div className="rounded border border-redpen/30 bg-redpen-soft px-3 py-2 text-sm text-redpen">
+              {subjectModalError}
+            </div>
+          )}
+
+          <div className="flex items-center justify-end gap-2 border-t border-paper-rule pt-4">
+            <Button
+              type="button"
+              variant="quiet"
+              disabled={creatingSubject}
+              onClick={() => setShowSubjectModal(false)}
+            >
+              ยกเลิก
+            </Button>
+            <Button type="submit" disabled={creatingSubject}>
+              {creatingSubject ? "กำลังบันทึก…" : "บันทึกรายวิชา"}
             </Button>
           </div>
         </form>

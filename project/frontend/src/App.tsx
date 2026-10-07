@@ -218,6 +218,7 @@ export default function App() {
           onNavigate={navigate}
           onLogout={handleLogout}
           onSelectNote={(noteId) => go("note-detail", { noteId })}
+          onCreateSubject={catalog.createSubject}
         />
       );
 
@@ -254,6 +255,7 @@ export default function App() {
           onNavigate={navigate}
           onLogout={handleLogout}
           onSelectNote={(noteId) => go("note-detail", { noteId })}
+          onCreateSubject={catalog.createSubject}
         />
       );
   }

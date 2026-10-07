@@ -18,7 +18,7 @@ interface SubjectsViewProps {
   onNavigate: (view: ViewName) => void;
   onLogout: () => void;
   onOpenSubject: (subjectId: number) => void;
-  onCreateSubject: (subject: { code: string; name: string; term: string }) => Promise<void>;
+  onCreateSubject?: (subject: { code: string; name: string; term: string }) => Promise<Subject | void>;
   onDeleteSubject: (id: number) => Promise<void>;
 }
 
@@ -47,7 +47,9 @@ export function SubjectsView({
     setError(null);
     setSaving(true);
     try {
-      await onCreateSubject(form);
+      if (onCreateSubject) {
+        await onCreateSubject(form);
+      }
       setForm({ code: "", name: "", term: "" });
       setShowForm(false);
     } catch (err) {
@@ -84,12 +86,33 @@ export function SubjectsView({
     >
       {showForm && (
         <div className="mb-5 grid gap-3 rounded-sheet border border-paper-rule bg-white p-5 shadow-sheet sm:grid-cols-3">
-          <Field label="รหัสวิชา" placeholder="CS999" value={form.code} onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))} />
-          <Field label="ชื่อวิชา" placeholder="ชื่อวิชาใหม่" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
-          <Field label="ภาคการศึกษา" placeholder="1/2569" value={form.term} onChange={(e) => setForm((f) => ({ ...f, term: e.target.value }))} />
-          {error && <p className="sm:col-span-3 rounded border border-redpen/30 bg-redpen-soft px-3 py-2 text-sm text-redpen">{error}</p>}
+          <Field
+            label="รหัสวิชา"
+            placeholder="CS999"
+            value={form.code}
+            onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
+          />
+          <Field
+            label="ชื่อวิชา"
+            placeholder="ชื่อวิชาใหม่"
+            value={form.name}
+            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+          />
+          <Field
+            label="ภาคการศึกษา"
+            placeholder="1/2569"
+            value={form.term}
+            onChange={(e) => setForm((f) => ({ ...f, term: e.target.value }))}
+          />
+          {error && (
+            <p className="sm:col-span-3 rounded border border-redpen/30 bg-redpen-soft px-3 py-2 text-sm text-redpen">
+              {error}
+            </p>
+          )}
           <div className="sm:col-span-3">
-            <Button onClick={submit} disabled={saving}>{saving ? "กำลังบันทึก…" : "บันทึกรายวิชา"}</Button>
+            <Button onClick={submit} disabled={saving}>
+              {saving ? "กำลังบันทึก…" : "บันทึกรายวิชา"}
+            </Button>
           </div>
         </div>
       )}

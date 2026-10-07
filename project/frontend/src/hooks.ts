@@ -131,8 +131,9 @@ export function useCatalog(subjectId: number | undefined) {
 
   const createSubject = useCallback(
     async (subject: { code: string; name: string; term: string }) => {
-      await api.createSubject(subject);
+      const created = await api.createSubject(subject);
       await reloadSubjects();
+      return created;
     },
     [reloadSubjects]
   );
