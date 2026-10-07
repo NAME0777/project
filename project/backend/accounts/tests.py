@@ -6,6 +6,9 @@ from rest_framework.test import APIClient
 
 from .models import User
 
+STUDENT_ID = "98765432"
+STUDENT_EMAIL = f"{STUDENT_ID}@kmitl.ac.th"
+
 
 @override_settings(GOOGLE_CLIENT_ID="test-client-id", ALLOWED_EMAIL_DOMAIN="kmitl.ac.th")
 class GoogleLoginTests(TestCase):
@@ -15,7 +18,7 @@ class GoogleLoginTests(TestCase):
 	@patch("accounts.views.id_token.verify_oauth2_token")
 	def test_creates_student_from_verified_institution_account(self, verify_token):
 		verify_token.return_value = {
-			"email": "66200122@kmitl.ac.th",
+			"email": STUDENT_EMAIL,
 			"email_verified": True,
 			"hd": "kmitl.ac.th",
 			"name": "Student Name",
@@ -24,8 +27,8 @@ class GoogleLoginTests(TestCase):
 		response = self.client.post("/api/auth/google/", {"credential": "valid-token"}, format="json")
 
 		self.assertEqual(response.status_code, 200)
-		user = User.objects.get(email="66200122@kmitl.ac.th")
-		self.assertEqual(user.student_id, "66200122")
+		user = User.objects.get(email=STUDENT_EMAIL)
+		self.assertEqual(user.student_id, STUDENT_ID)
 		self.assertEqual(user.role, User.Role.STUDENT)
 		self.assertEqual(response.data["user"]["full_name"], "Student Name")
 		self.assertIn("access", response.data)
@@ -34,8 +37,8 @@ class GoogleLoginTests(TestCase):
 	@patch("accounts.views.id_token.verify_oauth2_token")
 	def test_rejects_unverified_or_non_institution_email(self, verify_token):
 		invalid_claims = [
-			{"email": "66200122@kmitl.ac.th", "email_verified": False, "hd": "kmitl.ac.th"},
-			{"email": "66200122@gmail.com", "email_verified": True, "hd": "gmail.com"},
+			{"email": STUDENT_EMAIL, "email_verified": False, "hd": "kmitl.ac.th"},
+			{"email": f"{STUDENT_ID}@gmail.com", "email_verified": True, "hd": "gmail.com"},
 			{"email": "student@kmitl.ac.th", "email_verified": True, "hd": "kmitl.ac.th"},
 		]
 
@@ -50,14 +53,14 @@ class GoogleLoginTests(TestCase):
 	@patch("accounts.views.id_token.verify_oauth2_token")
 	def test_does_not_allow_admin_google_login(self, verify_token):
 		User.objects.create_user(
-			email="66200122@kmitl.ac.th",
+			email=STUDENT_EMAIL,
 			password="admin-password",
 			full_name="Administrator",
-			student_id="66200122",
+			student_id=STUDENT_ID,
 			role=User.Role.ADMIN,
 		)
 		verify_token.return_value = {
-			"email": "66200122@kmitl.ac.th",
+			"email": STUDENT_EMAIL,
 			"email_verified": True,
 			"hd": "kmitl.ac.th",
 			"name": "Administrator",
@@ -66,7 +69,7 @@ class GoogleLoginTests(TestCase):
 		response = self.client.post("/api/auth/google/", {"credential": "valid-token"}, format="json")
 
 		self.assertEqual(response.status_code, 403)
-		self.assertEqual(User.objects.get(email="66200122@kmitl.ac.th").role, User.Role.ADMIN)
+		self.assertEqual(User.objects.get(email=STUDENT_EMAIL).role, User.Role.ADMIN)
 
 	@patch("accounts.views.id_token.verify_oauth2_token")
 	def test_reports_audience_mismatch_without_echoing_token(self, verify_token):

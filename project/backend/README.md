@@ -42,15 +42,10 @@ cp .env.example .env             # แก้ DATABASE_URL ให้ตรงก�
 # ตั้ง GOOGLE_CLIENT_ID ใน backend/.env และ VITE_GOOGLE_CLIENT_ID ใน frontend/.env.local
 
 python manage.py migrate
-python manage.py seed_demo       # สร้างบัญชีทดสอบ + รายวิชา + โน้ตตัวอย่าง
 python manage.py runserver 8000
 ```
 
-บัญชีทดสอบหลัง `seed_demo`:
-| อีเมล | รหัสผ่าน | สิทธิ์ |
-| --- | --- | --- |
-| admin@kmitl.ac.th | admin123 | ผู้ดูแลระบบ |
-| 66200122@kmitl.ac.th | student123 | นักศึกษา |
+ระบบไม่สร้างบัญชีหรือโน้ตตัวอย่างอัตโนมัติ สร้างผู้ดูแลระบบด้วย `python manage.py createsuperuser`; นักศึกษาสมัคร/เข้าสู่ระบบด้วยบัญชี Google ของสถาบัน
 
 ## โครงสร้างแอป
 
@@ -58,7 +53,7 @@ python manage.py runserver 8000
 backend/
 ├─ config/          settings.py (Postgres/JWT/CORS/minIO), urls.py
 ├─ accounts/        User model (email login, role: student/admin), register/login/me
-├─ subjects/        Subject, Topic (+ seed_demo command)
+├─ subjects/        Subject, Topic
 ├─ notes/           Note, Revision (บันทึกทุกเวอร์ชัน ไม่ทับของเดิม)
 └─ core/            permission ร่วม (IsAdminRole), OCR (mock), Dashboard (สถิติจริงจาก DB)
 ```

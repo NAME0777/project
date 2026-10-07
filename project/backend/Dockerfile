@@ -15,6 +15,6 @@ COPY . .
 
 EXPOSE 8000
 
-# Wait for Postgres, migrate, seed demo data, then run the dev server.
+# Wait for Postgres, migrate, then run the dev server.
 # For a real production deploy swap this for gunicorn (see README "Phase 11").
-CMD ["sh", "-c", "python manage.py migrate --noinput && python manage.py seed_demo && python manage.py runserver 0.0.0.0:8000"]
+CMD ["sh", "-c", "python manage.py migrate --noinput && python manage.py runserver 0.0.0.0:8000"]

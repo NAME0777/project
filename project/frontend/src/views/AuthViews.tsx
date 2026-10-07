@@ -91,16 +91,20 @@ export function LoginView({ onLogin, onGoogleLogin, error, pending }: LoginViewP
       footer={<span>เข้าสู่ระบบด้วยบัญชี Google ของสถาบัน</span>}
     >
       <div className="space-y-4">
+        <div>
+        <Field label="อีเมลมหาวิทยาลัย" type="email" autoComplete="username" placeholder="example@kmitl.ac.th" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <Field label="รหัสผ่าน" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} />
+        <div className="mt-6">
+          <Button full onClick={submit} disabled={pending}>{pending ? "กำลังเข้าสู่ระบบ…" : "เข้าสู่ระบบ"}</Button>
+        </div>
+        </div>
+        <div className="border-t border-paper-rule pt-4">
         {googleClientId ? (
           <div ref={googleButton} className="flex min-h-10 justify-center" />
         ) : (
           <p className="text-sm text-redpen">ยังไม่ได้ตั้งค่า Google Sign-In</p>
         )}
         {shownError && <p className="rounded border border-redpen/30 bg-redpen-soft px-3 py-2 text-sm text-redpen">{shownError}</p>}
-        <div className="border-t border-paper-rule pt-4">
-        <Field label="อีเมลมหาวิทยาลัย" type="email" autoComplete="username" placeholder="66200122@kmitl.ac.th" value={email} onChange={(e) => setEmail(e.target.value)} />
-        <Field label="รหัสผ่าน" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} />
-        <Button full onClick={submit} disabled={pending}>{pending ? "กำลังเข้าสู่ระบบ…" : "เข้าสู่ระบบ"}</Button>
         </div>
       </div>
     </AuthCard>
