@@ -14,10 +14,10 @@ import { OcrView, DashboardView } from "./views/ToolViews";
 import type { ViewName } from "./types";
 
 export default function App() {
-  const { route, go, reset, back } = useRouter({ name: "notes" });
+  const { route, go, reset, back, replace } = useRouter({ name: "notes" });
   const { user, login, googleLogin, logout, error: loginError, pending: loginPending, checking } = useAuth();
   const catalog = useCatalog(route.subjectId);
-  const { note, loading: noteLoading, saveRevision } = useNote(route.noteId);
+  const { note, loading: noteLoading, saveRevision, reload: reloadNote } = useNote(route.noteId);
 
   const handleLogout = () => {
     logout();
@@ -68,9 +68,17 @@ export default function App() {
           onNavigate={navigate}
           onLogout={handleLogout}
           onBack={back}
-          onOpenNote={(topicId, noteId) =>
-            go("note", { subjectId: route.subjectId, topicId, noteId: noteId ?? undefined })
+          onWriteWiki={() =>
+            go("editor", { subjectId: route.subjectId })
           }
+          onOpenNote={(topicId, noteId, hasNote) => {
+            if (hasNote && noteId) {
+              go("note", { subjectId: route.subjectId, topicId, noteId });
+            } else {
+              // ยังไม่มีโน้ต -> ให้ไปหน้าเขียนวิกิบทเรียนได้ทันที
+              go("editor", { subjectId: route.subjectId, topicId });
+            }
+          }}
           onCreateTopic={catalog.createTopic}
           onUpdateTopic={catalog.updateTopic}
           onDeleteTopic={catalog.deleteTopic}
@@ -89,18 +97,29 @@ export default function App() {
           subjectCode={catalog.subjects.find((s) => s.id === (note?.subject || route.subjectId))?.code}
           onNavigate={navigate}
           onLogout={handleLogout}
-          onBack={back}
+          onBack={() => {
+            if (route.subjectId) {
+              go("topics", { subjectId: route.subjectId });
+            } else {
+              back();
+            }
+          }}
           onEdit={() =>
             go("editor", { subjectId: route.subjectId, topicId: route.topicId, noteId: route.noteId })
           }
           onRollback={async (content, summary) => {
             await saveRevision(content, summary);
+            await reloadNote?.();
           }}
           onDelete={async () => {
             if (note) {
               await api.deleteNote(note.id);
               await catalog.reloadTopics?.();
-              back();
+              if (route.subjectId) {
+                go("topics", { subjectId: route.subjectId });
+              } else {
+                back();
+              }
             }
           }}
         />
@@ -125,23 +144,35 @@ export default function App() {
               // 1. มีโน้ตเดิมอยู่แล้ว -> บันทึก Revision ใหม่
               await saveRevision(data.content || "", data.summary || "แก้ไขโน้ต");
 
-              // 2. อัปเดตชื่อหัวข้อ (ถ้ามี)
+              // 2. อัปเดตชื่อหัวข้อ / โน้ต (ถ้ามีการแก้ชื่อ)
+              if (data.title && data.title !== note.title) {
+                await api.updateNote(note.id, { title: data.title });
+              }
               if (catalog.updateTopic && data.title && route.topicId) {
                 await catalog.updateTopic(route.topicId, data.title);
               }
-            } else if (route.subjectId && route.topicId) {
-              // 3. ยังไม่มีโน้ตสำหรับหัวข้อนี้ -> สร้างโน้ตใหม่พร้อมผูกกับ topicId
-              await api.createNote(
+              await reloadNote?.();
+              await catalog.reloadTopics?.();
+              back();
+            } else if (route.subjectId) {
+              // 3. สร้างโน้ตวิกิใหม่ -> บันทึกลง DB
+              const created = await api.createNote(
                 route.subjectId,
-                data.title || currentTopic?.title || "โน้ต",
+                data.title || currentTopic?.title || "หัวข้อบทเรียน",
                 data.content || "",
                 null,
                 route.topicId
               );
               await catalog.reloadTopics?.();
+              // แทนที่หน้า editor ด้วยหน้าอ่านวิกิที่เพิ่งสร้างทันที โหลดข้อมูลขึ้นมาทันที ไม่ต้องรีเฟรช
+              replace("note", {
+                subjectId: route.subjectId,
+                topicId: route.topicId,
+                noteId: created.id,
+              });
+            } else {
+              back();
             }
-
-            back();
           }}
         />
       );
