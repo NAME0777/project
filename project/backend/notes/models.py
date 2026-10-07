@@ -28,6 +28,7 @@ class Note(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
+        db_table = "note"
         ordering = ["-updated_at"]
 
     def __str__(self):
@@ -42,6 +43,7 @@ class Revision(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        db_table = "note_revision"
         ordering = ["-created_at"]
 
     def __str__(self):
