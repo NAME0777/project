@@ -5,19 +5,75 @@
  * role มาจากบัญชีจริงใน backend เสมอ — ฟอร์มนี้ไม่มีตัวเลือก role ให้กดเอง
  * (สมัครผ่านหน้านี้ได้แค่สิทธิ์นักศึกษา ผู้ดูแลระบบสร้างผ่าน Django admin เท่านั้น)
  */
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AuthCard, Button, Field } from "../ui";
+
+declare global {
+  interface Window {
+    google?: {
+      accounts: {
+        id: {
+          initialize: (options: {
+            client_id: string;
+            callback: (response: { credential: string }) => void;
+          }) => void;
+          renderButton: (element: HTMLElement, options: Record<string, string>) => void;
+        };
+      };
+    };
+  }
+}
 
 interface LoginViewProps {
   onLogin: (email: string, password: string) => void;
-  onGoRegister: () => void;
+  onGoogleLogin: (credential: string) => void;
   error: string | null;
   pending: boolean;
 }
-export function LoginView({ onLogin, onGoRegister, error, pending }: LoginViewProps) {
+export function LoginView({ onLogin, onGoogleLogin, error, pending }: LoginViewProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
+  const googleButton = useRef<HTMLDivElement>(null);
+  const googleLoginRef = useRef(onGoogleLogin);
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
+  useEffect(() => {
+    googleLoginRef.current = onGoogleLogin;
+  }, [onGoogleLogin]);
+
+  useEffect(() => {
+    if (!googleClientId || !googleButton.current) return;
+
+    const renderGoogleButton = () => {
+      if (!window.google || !googleButton.current) return;
+      window.google.accounts.id.initialize({
+        client_id: googleClientId,
+        callback: ({ credential }) => googleLoginRef.current(credential),
+      });
+      window.google.accounts.id.renderButton(googleButton.current, {
+        type: "standard",
+        theme: "outline",
+        size: "large",
+        text: "signin_with",
+        shape: "rectangular",
+        width: "320",
+      });
+    };
+
+    if (window.google) {
+      renderGoogleButton();
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.defer = true;
+    script.onload = renderGoogleButton;
+    document.head.appendChild(script);
+    return () => script.remove();
+  }, [googleClientId]);
 
   const submit = () => {
     if (!email.endsWith("@kmitl.ac.th")) return setFormError("ใช้ได้เฉพาะอีเมลของสถาบัน ลงท้ายด้วย @kmitl.ac.th");
@@ -32,13 +88,20 @@ export function LoginView({ onLogin, onGoRegister, error, pending }: LoginViewPr
     <AuthCard
       title="คลังโน้ตเรียนประจำสาขา"
       subtitle="โน้ตของรุ่นพี่ที่รุ่นน้องช่วยกันแก้ให้ดีขึ้นทุกเทอม"
-      footer={<>ยังไม่มีบัญชี <button onClick={onGoRegister} className="text-pen hover:underline">สมัครด้วยอีเมลสถาบัน</button></>}
+      footer={<span>เข้าสู่ระบบด้วยบัญชี Google ของสถาบัน</span>}
     >
       <div className="space-y-4">
+        {googleClientId ? (
+          <div ref={googleButton} className="flex min-h-10 justify-center" />
+        ) : (
+          <p className="text-sm text-redpen">ยังไม่ได้ตั้งค่า Google Sign-In</p>
+        )}
+        {shownError && <p className="rounded border border-redpen/30 bg-redpen-soft px-3 py-2 text-sm text-redpen">{shownError}</p>}
+        <div className="border-t border-paper-rule pt-4">
         <Field label="อีเมลมหาวิทยาลัย" type="email" autoComplete="username" placeholder="66200122@kmitl.ac.th" value={email} onChange={(e) => setEmail(e.target.value)} />
         <Field label="รหัสผ่าน" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} />
-        {shownError && <p className="rounded border border-redpen/30 bg-redpen-soft px-3 py-2 text-sm text-redpen">{shownError}</p>}
         <Button full onClick={submit} disabled={pending}>{pending ? "กำลังเข้าสู่ระบบ…" : "เข้าสู่ระบบ"}</Button>
+        </div>
       </div>
     </AuthCard>
   );

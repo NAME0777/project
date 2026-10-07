@@ -8,6 +8,7 @@
 - **Django 6 + Django REST Framework** — เว็บเฟรมเวิร์กหลัก + REST API
 - **PostgreSQL** — ฐานข้อมูลหลัก (ผ่าน `DATABASE_URL`)
 - **djangorestframework-simplejwt** — ออก JWT (access/refresh token) ตอน login จริง ไม่ใช่ mock
+- **Google OAuth (google-auth)** — ตรวจ Google ID token ก่อนสร้าง/ล็อกอินบัญชีนักศึกษา
 - **django-storages + boto3** — พร้อมต่อ **minIO** (S3-compatible) สำหรับเก็บไฟล์แนบ เปิดใช้ด้วย `USE_S3_STORAGE=True`
 - **Tesseract OCR (ผ่าน pytesseract + pdf2image)** — แปลงรูปภาพ/PDF เป็นข้อความ ไทย+อังกฤษ (Phase 2)
 
@@ -38,6 +39,7 @@ source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
 cp .env.example .env             # แก้ DATABASE_URL ให้ตรงกับ Postgres ของคุณ
+# ตั้ง GOOGLE_CLIENT_ID ใน backend/.env และ VITE_GOOGLE_CLIENT_ID ใน frontend/.env.local
 
 python manage.py migrate
 python manage.py seed_demo       # สร้างบัญชีทดสอบ + รายวิชา + โน้ตตัวอย่าง
@@ -67,6 +69,7 @@ backend/
 | --- | --- | --- | --- |
 | POST | `/api/auth/register/` | ทุกคน | สมัครสมาชิก (ได้สิทธิ์นักศึกษาเท่านั้น) |
 | POST | `/api/auth/login/` | ทุกคน | ล็อกอิน คืน JWT + ข้อมูลผู้ใช้ |
+| POST | `/api/auth/google/` | ทุกคน | ตรวจ Google ID token และล็อกอิน/สร้างบัญชีนักศึกษา KMITL |
 | GET | `/api/auth/me/` | ล็อกอินแล้ว | ข้อมูลตัวเอง |
 | GET | `/api/subjects/` | ล็อกอินแล้ว | รายวิชาทั้งหมด |
 | POST | `/api/subjects/` | **ผู้ดูแลระบบเท่านั้น** | เพิ่มรายวิชาใหม่ |
@@ -110,4 +113,3 @@ AWS_S3_ENDPOINT_URL=http://<minio-host>:9000
 
 - **Text-to-Speech** — ยังไม่มี endpoint (Phase 3)
 - **Wiki diff/version compare แบบเห็นภาพ** — มี Revision เก็บครบทุกเวอร์ชันแล้ว แต่ยังไม่มี diff viewer (Phase 4)
-- **Google OAuth** — ตอนนี้ล็อกอินด้วยอีเมล+รหัสผ่านของระบบเอง ยังไม่ได้ต่อ OAuth ภายนอก
