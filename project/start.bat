@@ -40,9 +40,8 @@ if not exist backend\.env (
     echo   Created backend\.env from the example file. Edit DATABASE_URL to match your PostgreSQL setup.
 )
 
-echo [3/4] Preparing database (migrate + seed demo data)...
+echo [3/4] Preparing database (migrate)...
 call backend\venv\Scripts\python.exe backend\manage.py migrate
-call backend\venv\Scripts\python.exe backend\manage.py seed_demo
 
 if not exist frontend\node_modules (
     echo [4/4] Installing frontend dependencies...

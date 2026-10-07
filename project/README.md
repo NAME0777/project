@@ -45,6 +45,8 @@ docker compose up --build
 
 หยุดทั้งระบบ: `docker compose down` (เติม `-v` ถ้าอยากลบข้อมูลในฐานข้อมูลด้วย)
 
+Google Sign-In ใช้ client ID ที่ตั้งไว้ใน `docker-compose.yml` เป็นค่าเริ่มต้น และ override ได้ด้วย `GOOGLE_CLIENT_ID` ในไฟล์ `.env` ที่ root ของโปรเจกต์ หากนำไปใช้กับ origin อื่น ให้เพิ่ม origin นั้นใน Google Cloud Console ด้วย
+
 แก้โค้ดได้ตามปกติแล้วเห็นผลทันทีโดยไม่ต้อง build ใหม่ (โฟลเดอร์ `backend/` และ `frontend/` ถูก mount เข้า container แบบ live)
 
 ### ทางเลือก B: ลงเองในเครื่อง (ไม่ใช้ Docker)
@@ -53,6 +55,8 @@ docker compose up --build
 
 **Windows:** ดับเบิลคลิก `start.bat`
 **macOS/Linux:** `./start.sh`
+
+เมื่อติดตั้งแยกเครื่อง ให้ตั้ง `GOOGLE_CLIENT_ID` ใน `backend/.env` และ `VITE_GOOGLE_CLIENT_ID` ใน `frontend/.env.local` เป็น OAuth client ID เดียวกัน
 
 ทั้งสองแบบจะสร้าง virtualenv, ติดตั้ง dependency, migrate ฐานข้อมูล, seed ข้อมูลตัวอย่าง แล้วเปิดทั้ง backend+frontend ให้อัตโนมัติ เปิดเบราว์เซอร์ไปที่ **http://localhost:5173**
 

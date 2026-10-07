@@ -6,6 +6,8 @@ django-cors-headers==4.9.0
 django-storages==1.14.6
 boto3==1.43.103
 django-environ==0.12.0
+google-auth[requests]==2.40.3
+cryptography==50.0.2
 
 # Phase 2: OCR (scope item 3)
 # Requires system-level tesseract-ocr + tesseract-ocr-tha + poppler-utils too (see core/ocr.py)

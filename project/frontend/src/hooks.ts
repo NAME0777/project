@@ -67,12 +67,27 @@ export function useAuth() {
     }
   }, []);
 
+  const googleLogin = useCallback(async (credential: string) => {
+    setPending(true);
+    setError(null);
+    try {
+      const loggedIn = await api.googleLogin(credential);
+      setUser(loggedIn as User);
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "เข้าสู่ระบบด้วย Google ไม่สำเร็จ");
+      return false;
+    } finally {
+      setPending(false);
+    }
+  }, []);
+
   const logout = useCallback(() => {
     api.logout();
     setUser(null);
   }, []);
 
-  return { user, login, logout, error, pending, checking };
+  return { user, login, googleLogin, logout, error, pending, checking };
 }
 
 // ---- useCatalog ------------------------------------------------------------

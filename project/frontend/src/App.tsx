@@ -15,7 +15,7 @@ import type { ViewName } from "./types";
 
 export default function App() {
   const { route, go, reset, back } = useRouter({ name: "notes" });
-  const { user, login, logout, error: loginError, pending: loginPending, checking } = useAuth();
+  const { user, login, googleLogin, logout, error: loginError, pending: loginPending, checking } = useAuth();
   const catalog = useCatalog(route.subjectId);
   const { note, loading: noteLoading, saveRevision } = useNote(route.noteId);
 
@@ -36,7 +36,10 @@ export default function App() {
           const ok = await login(email, password);
           if (ok) reset("notes");
         }}
-        onGoRegister={() => go("register")}
+        onGoogleLogin={async (credential) => {
+          const ok = await googleLogin(credential);
+          if (ok) reset("notes");
+        }}
         error={loginError}
         pending={loginPending}
       />

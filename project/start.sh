@@ -14,9 +14,8 @@ backend/venv/bin/pip install -q -r backend/requirements.txt
 
 [ -f backend/.env ] || { cp backend/.env.example backend/.env; echo "  สร้าง backend/.env แล้ว แก้ DATABASE_URL ให้ตรงกับ PostgreSQL ของคุณก่อนใช้งานจริง"; }
 
-echo "[3/4] เตรียมฐานข้อมูล (migrate + seed ข้อมูลตัวอย่าง)..."
+echo "[3/4] เตรียมฐานข้อมูล (migrate)..."
 backend/venv/bin/python backend/manage.py migrate
-backend/venv/bin/python backend/manage.py seed_demo
 
 [ -d frontend/node_modules ] || { echo "[4/4] ติดตั้ง dependency ของ frontend..."; npm install --prefix frontend; }
 

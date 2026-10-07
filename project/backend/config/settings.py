@@ -91,6 +91,7 @@ AUTH_PASSWORD_VALIDATORS = [
 # ---- อีเมลสถาบันที่อนุญาต (ใช้ตรวจตอนสมัคร/ล็อกอิน) --------------------------
 
 ALLOWED_EMAIL_DOMAIN = env("ALLOWED_EMAIL_DOMAIN", default="kmitl.ac.th")
+GOOGLE_CLIENT_ID = env("GOOGLE_CLIENT_ID", default="")
 
 # ---- ภาษา/เวลา --------------------------------------------------------------
 

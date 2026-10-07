@@ -30,8 +30,8 @@ function saveTokens(tokens: Tokens | null) {
   else localStorage.removeItem(TOKEN_KEY);
 }
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const tokens = loadTokens();
+async function request<T>(path: string, options?: RequestInit, includeApiToken = true): Promise<T> {
+  const tokens = includeApiToken ? loadTokens() : null;
   const headers: Record<string, string> = {};
   const isFormData = options?.body instanceof FormData;
   if (!isFormData) headers["Content-Type"] = "application/json";
@@ -67,13 +67,22 @@ export const api = {
     const data = await request<AuthResponse>("/auth/login/", {
       method: "POST",
       body: JSON.stringify({ email, password }),
-    });
+    }, false);
+    saveTokens({ access: data.access, refresh: data.refresh });
+    return data.user;
+  },
+
+  googleLogin: async (credential: string) => {
+    const data = await request<AuthResponse>("/auth/google/", {
+      method: "POST",
+      body: JSON.stringify({ credential }),
+    }, false);
     saveTokens({ access: data.access, refresh: data.refresh });
     return data.user;
   },
 
   register: async (form: { full_name: string; student_id: string; email: string; password: string }) => {
-    const data = await request<AuthResponse>("/auth/register/", { method: "POST", body: JSON.stringify(form) });
+    const data = await request<AuthResponse>("/auth/register/", { method: "POST", body: JSON.stringify(form) }, false);
     saveTokens({ access: data.access, refresh: data.refresh });
     return data.user;
   },
