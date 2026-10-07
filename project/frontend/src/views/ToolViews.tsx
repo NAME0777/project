@@ -13,9 +13,9 @@ interface OcrViewProps {
   user: User;
   onNavigate: (view: ViewName) => void;
   onLogout: () => void;
-  onSaveNote: (content: string, sourceFile?: File) => void;
+  onSaveNote?: (content: string, sourceFile?: File) => void;
 }
-export function OcrView({ user, onNavigate, onLogout, onSaveNote }: OcrViewProps) {
+export function OcrView({ user, onNavigate, onLogout, onSaveNote: _onSaveNote }: OcrViewProps) {
   const ocr = useOcr();
 
   return (
@@ -42,7 +42,7 @@ export function OcrView({ user, onNavigate, onLogout, onSaveNote }: OcrViewProps
           <div className="space-y-3">
             <TextAreaField label="ข้อความที่อ่านได้" hint="ตรวจคำที่อ่านผิดก่อนบันทึก โดยเฉพาะสูตรและตัวเลข" className="h-48" value={ocr.text} onChange={(e) => ocr.setText(e.target.value)} />
             <div className="flex flex-wrap gap-2">
-              <Button variant="confirm" onClick={() => { onSaveNote(ocr.text ?? "", ocr.file ?? undefined); ocr.reset(); }}>บันทึกเป็นโน้ตใหม่</Button>
+              {/* <Button variant="confirm" onClick={() => { onSaveNote(ocr.text ?? "", ocr.file ?? undefined); ocr.reset(); }}>บันทึกเป็นโน้ตใหม่</Button> */}
               <Button variant="quiet" onClick={ocr.reset}>เริ่มใหม่</Button>
             </div>
           </div>

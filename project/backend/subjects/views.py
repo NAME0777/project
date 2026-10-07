@@ -6,24 +6,29 @@ from .models import Subject, Topic
 from .serializers import SubjectSerializer, TopicSerializer
 
 
-class IsAdminOrReadOnly(permissions.BasePermission):
-    """ใครล็อกอินแล้วก็อ่านได้ แต่เขียน/แก้/ลบได้เฉพาะผู้ดูแลระบบ (role=admin)"""
+class CanCreateOrAdminOnly(permissions.BasePermission):
+    """
+    ผู้ใช้ทุกคนที่ล็อกอินแล้ว (รวมนักศึกษา): อ่าน (GET) และเพิ่มรายการใหม่ (POST) ได้
+    ผู้ดูแลระบบ (Admin) เท่านั้น: แก้ไข (PUT/PATCH) หรือลบ (DELETE)
+    """
 
     def has_permission(self, request, view):
-        if request.method in permissions.SAFE_METHODS:
-            return bool(request.user and request.user.is_authenticated)
-        return bool(request.user and request.user.is_authenticated and request.user.is_admin_role)
+        if not (request.user and request.user.is_authenticated):
+            return False
+        if request.method in permissions.SAFE_METHODS or request.method == "POST":
+            return True
+        return bool(request.user.is_admin_role)
 
 
 class SubjectViewSet(viewsets.ModelViewSet):
     """
-    นักศึกษา: ดูรายวิชาได้ (GET)
-    ผู้ดูแลระบบ: เพิ่ม/แก้ไข/ลบรายวิชาได้ด้วย (ขอบเขตข้อ 1 — ควบคุมเนื้อหาทั้งระบบ)
+    นักศึกษา: ดูรายวิชาได้ (GET) และเพิ่มรายวิชาใหม่ได้ (POST)
+    ผู้ดูแลระบบ: แก้ไข/ลบรายวิชาได้ (PUT, PATCH, DELETE)
     """
 
     queryset = Subject.objects.all()
     serializer_class = SubjectSerializer
-    permission_classes = [IsAdminOrReadOnly]
+    permission_classes = [CanCreateOrAdminOnly]
 
     @action(detail=True, methods=["get"])
     def topics(self, request, pk=None):
@@ -33,11 +38,14 @@ class SubjectViewSet(viewsets.ModelViewSet):
 
 
 class TopicViewSet(viewsets.ModelViewSet):
-    """หัวข้อบทเรียนของแต่ละวิชา — เขียนได้เฉพาะผู้ดูแลระบบเช่นกัน"""
+    """
+    นักศึกษา: ดูหัวข้อ (GET) และเพิ่มหัวข้อบทเรียนใหม่ได้ (POST)
+    ผู้ดูแลระบบ: แก้ไข/ลบหัวข้อบทเรียนได้ (PUT, PATCH, DELETE)
+    """
 
     queryset = Topic.objects.select_related("note").all()
     serializer_class = TopicSerializer
-    permission_classes = [IsAdminOrReadOnly]
+    permission_classes = [CanCreateOrAdminOnly]
 
     def get_queryset(self):
         qs = super().get_queryset()

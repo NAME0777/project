@@ -9,11 +9,12 @@ import { useAuth, useCatalog, useNote, useRouter } from "./hooks";
 import { LoginView, RegisterView } from "./views/AuthViews";
 import { SubjectsView, TopicsView } from "./views/CatalogViews";
 import { NoteView, EditorView } from "./views/NoteViews";
+import { NotesHubView, NoteFileDetailView } from "./views/NotesHubViews";
 import { OcrView, DashboardView } from "./views/ToolViews";
 import type { ViewName } from "./types";
 
 export default function App() {
-  const { route, go, reset, back } = useRouter();
+  const { route, go, reset, back } = useRouter({ name: "notes" });
   const { user, login, logout, error: loginError, pending: loginPending, checking } = useAuth();
   const catalog = useCatalog(route.subjectId);
   const { note, loading: noteLoading, saveRevision } = useNote(route.noteId);
@@ -33,7 +34,7 @@ export default function App() {
       <LoginView
         onLogin={async (email, password) => {
           const ok = await login(email, password);
-          if (ok) reset("subjects");
+          if (ok) reset("notes");
         }}
         onGoRegister={() => go("register")}
         error={loginError}
@@ -64,7 +65,9 @@ export default function App() {
           onNavigate={navigate}
           onLogout={handleLogout}
           onBack={back}
-          onOpenNote={(noteId) => go("note", { subjectId: route.subjectId, noteId })}
+          onOpenNote={(topicId, noteId) =>
+            go("note", { subjectId: route.subjectId, topicId, noteId: noteId ?? undefined })
+          }
           onCreateTopic={catalog.createTopic}
           onUpdateTopic={catalog.updateTopic}
           onDeleteTopic={catalog.deleteTopic}
@@ -72,10 +75,10 @@ export default function App() {
       );
 
     case "note": {
-      const currentTopic = catalog.topics.find((t) => t.id === route.noteId);
+      const currentTopic = catalog.topics.find((t) => t.id === route.topicId);
       return (
         <NoteView
-          key={route.noteId} // บังคับให้โหลดคอมโพเนนต์ใหม่เสมอเมื่อเปลี่ยน Note ID
+          key={`${route.topicId ?? "notopic"}-${route.noteId ?? "nonote"}`}
           user={user}
           note={note}
           loading={noteLoading}
@@ -84,39 +87,55 @@ export default function App() {
           onNavigate={navigate}
           onLogout={handleLogout}
           onBack={back}
-          onEdit={() => go("editor", { subjectId: route.subjectId, noteId: route.noteId })}
+          onEdit={() =>
+            go("editor", { subjectId: route.subjectId, topicId: route.topicId, noteId: route.noteId })
+          }
+          onRollback={async (content, summary) => {
+            await saveRevision(content, summary);
+          }}
         />
       );
     }
 
     case "editor": {
-  const topicForEdit = catalog.topics.find((t) => t.id === route.noteId);
-  return (
-    <EditorView
-      key={route.noteId} // บังคับให้ฟอร์มโหลดใหม่เมื่อสลับโน้ต
-      user={user}
-      note={note}
-      defaultTitle={topicForEdit?.title}
-      onNavigate={navigate}
-      onLogout={handleLogout}
-      onCancel={back}
-      onSave={async (formData) => {
-        const data = formData as any;
+      const currentTopic = catalog.topics.find((t) => t.id === route.topicId);
+      return (
+        <EditorView
+          key={`${route.topicId ?? "notopic"}-${route.noteId ?? "nonote"}`}
+          user={user}
+          note={note}
+          defaultTitle={currentTopic?.title}
+          onNavigate={navigate}
+          onLogout={handleLogout}
+          onCancel={back}
+          onSave={async (formData) => {
+            const data = formData as { title: string; content: string; summary: string };
 
-        // 1. บันทึกเนื้อหาโน้ต (Revision)
-        await saveRevision(data.content || "", data.summary || "แก้ไขโน้ต");
+            if (note && route.noteId) {
+              // 1. มีโน้ตเดิมอยู่แล้ว -> บันทึก Revision ใหม่
+              await saveRevision(data.content || "", data.summary || "แก้ไขโน้ต");
 
-        // 2. อัปเดตชื่อหัวข้อ (ถ้ามี)
-        if (catalog.updateTopic && data.title && route.noteId) {
-          await catalog.updateTopic(route.noteId, data.title);
-        }
+              // 2. อัปเดตชื่อหัวข้อ (ถ้ามี)
+              if (catalog.updateTopic && data.title && route.topicId) {
+                await catalog.updateTopic(route.topicId, data.title);
+              }
+            } else if (route.subjectId && route.topicId) {
+              // 3. ยังไม่มีโน้ตสำหรับหัวข้อนี้ -> สร้างโน้ตใหม่พร้อมผูกกับ topicId
+              await api.createNote(
+                route.subjectId,
+                data.title || currentTopic?.title || "โน้ต",
+                data.content || "",
+                null,
+                route.topicId
+              );
+              await catalog.reloadTopics?.();
+            }
 
-        // 3. ย้อนกลับไปหน้าก่อนหน้า (ถอยกลับโดยไม่ reload หน้า เพื่อไม่ให้หลุด Login)
-        back();
-      }}
-    />
-  );
-}
+            back();
+          }}
+        />
+      );
+    }
 
     case "ocr":
       return (
@@ -150,8 +169,29 @@ export default function App() {
       }
       return <DashboardView user={user} onNavigate={navigate} onLogout={handleLogout} />;
 
+    case "notes":
+      return (
+        <NotesHubView
+          user={user}
+          subjects={catalog.subjects}
+          onNavigate={navigate}
+          onLogout={handleLogout}
+          onSelectNote={(noteId) => go("note-detail", { noteId })}
+        />
+      );
+
+    case "note-detail":
+      return (
+        <NoteFileDetailView
+          user={user}
+          noteId={route.noteId}
+          onNavigate={navigate}
+          onLogout={handleLogout}
+          onBack={back}
+        />
+      );
+
     case "subjects":
-    default:
       return (
         <SubjectsView
           user={user}
@@ -162,6 +202,17 @@ export default function App() {
           onOpenSubject={(subjectId) => go("topics", { subjectId })}
           onCreateSubject={catalog.createSubject}
           onDeleteSubject={catalog.deleteSubject}
+        />
+      );
+
+    default:
+      return (
+        <NotesHubView
+          user={user}
+          subjects={catalog.subjects}
+          onNavigate={navigate}
+          onLogout={handleLogout}
+          onSelectNote={(noteId) => go("note-detail", { noteId })}
         />
       );
   }

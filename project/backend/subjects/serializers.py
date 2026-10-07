@@ -21,13 +21,9 @@ class TopicSerializer(serializers.ModelSerializer):
         fields = ["id", "subject", "order", "title", "note_id", "has_note"]
 
     def get_note_id(self, obj):
-        # ค้นหา Note ที่ผูกกับ Topic/Subject นี้
-        note = Note.objects.filter(pk=obj.id).first()
-        return note.id if note else getattr(obj, "note_id", None)
+        return obj.note_id
 
     def get_has_note(self, obj):
-        # ค้นหา Note และตรวจสอบว่ามี content ที่พิมพ์ไว้จริงๆ หรือไม่ (ไม่ใช่ค่าว่าง)
-        note = Note.objects.filter(pk=obj.id).first()
-        if note and note.content and len(note.content.strip()) > 0:
-            return True
+        if obj.note:
+            return bool((obj.note.content and len(obj.note.content.strip()) > 0) or obj.note.source_file)
         return False

@@ -3,6 +3,8 @@ export type Role = "student" | "admin";
 export type ViewName =
   | "login"
   | "register"
+  | "notes"
+  | "note-detail"
   | "subjects"
   | "topics"
   | "note"
@@ -13,6 +15,7 @@ export type ViewName =
 export interface Route {
   name: ViewName;
   subjectId?: number;
+  topicId?: number;
   noteId?: number;
 }
 
@@ -43,9 +46,11 @@ export interface Revision {
 export interface Note {
   id: number;
   subject: number;
+  subject_code?: string;
+  subject_name?: string;
   title: string;
   content: string;
-  source_file: string | null;
+  source_file?: string | null;
   created_at: string;
   updated_at: string;
   revisions: Revision[];

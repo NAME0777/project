@@ -16,7 +16,9 @@ environ.Env.read_env(BASE_DIR / ".env")
 
 SECRET_KEY = env("DJANGO_SECRET_KEY", default="dev-only-insecure-key-change-in-.env")
 DEBUG = env("DJANGO_DEBUG")
-ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
+ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["localhost", "127.0.0.1", "backend"])
+if "testserver" not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append("testserver")
 
 # ---- แอปทั้งหมด ------------------------------------------------------------
 
@@ -124,23 +126,32 @@ USE_S3_STORAGE = env.bool("USE_S3_STORAGE", default=False)
 
 STATIC_URL = "static/"
 
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
 if USE_S3_STORAGE:
-    # ต่อ minIO (S3-compatible): ตั้งค่าตัวแปรด้านล่างใน .env แล้วเปิด USE_S3_STORAGE=True
+    aws_access_key = env("AWS_ACCESS_KEY_ID", default="")
+    aws_secret_key = env("AWS_SECRET_ACCESS_KEY", default="")
+    aws_bucket = env("AWS_STORAGE_BUCKET_NAME", default="")
+    if not (aws_access_key and aws_secret_key and aws_bucket):
+        # หากตั้งค่า S3/MinIO ไม่ครบถ้วน ให้ Fallback เป็น FileSystemStorage ทันที
+        USE_S3_STORAGE = False
+
+if USE_S3_STORAGE:
+    # ต่อ minIO (S3-compatible) ผ่าน SafeS3Storage ที่มี fallback ไปยัง local อัตโนมัติหากเชื่อมต่อไม่ได้
     STORAGES = {
-        "default": {"BACKEND": "storages.backends.s3.S3Storage"},
+        "default": {"BACKEND": "core.storage.SafeS3Storage"},
         "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
     }
-    AWS_ACCESS_KEY_ID = env("AWS_ACCESS_KEY_ID")
-    AWS_SECRET_ACCESS_KEY = env("AWS_SECRET_ACCESS_KEY")
-    AWS_STORAGE_BUCKET_NAME = env("AWS_STORAGE_BUCKET_NAME")
-    AWS_S3_ENDPOINT_URL = env("AWS_S3_ENDPOINT_URL")
+    AWS_ACCESS_KEY_ID = env("AWS_ACCESS_KEY_ID", default="")
+    AWS_SECRET_ACCESS_KEY = env("AWS_SECRET_ACCESS_KEY", default="")
+    AWS_STORAGE_BUCKET_NAME = env("AWS_STORAGE_BUCKET_NAME", default="notes-hub")
+    AWS_S3_ENDPOINT_URL = env("AWS_S3_ENDPOINT_URL", default="http://localhost:9000")
     AWS_S3_REGION_NAME = env("AWS_S3_REGION_NAME", default="us-east-1")
     AWS_S3_ADDRESSING_STYLE = "path"  # minIO ต้องใช้ path-style ไม่ใช่ virtual-hosted-style
     AWS_DEFAULT_ACL = None
 else:
-    # ตอน dev: เก็บไฟล์อัปโหลดไว้ในโฟลเดอร์ backend/media/ ธรรมดา
-    MEDIA_URL = "media/"
-    MEDIA_ROOT = BASE_DIR / "media"
+    # เก็บไฟล์อัปโหลดไว้ในโฟลเดอร์ backend/media/ ธรรมดา
     STORAGES = {
         "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
         "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},

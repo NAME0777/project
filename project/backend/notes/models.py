@@ -7,7 +7,8 @@ from django.db import models
 
 
 def note_attachment_path(instance, filename):
-    return f"notes/{instance.subject_id}/{filename}"
+    subject_id = getattr(instance, "subject_id", None) or "general"
+    return f"notes/{subject_id}/{filename}"
 
 
 class Note(models.Model):

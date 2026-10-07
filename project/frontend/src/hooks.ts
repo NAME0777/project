@@ -161,6 +161,8 @@ export function useCatalog(subjectId: number | undefined) {
     createTopic,
     updateTopic,
     deleteTopic,
+    reloadTopics,
+    reloadSubjects,
   };
 }
 

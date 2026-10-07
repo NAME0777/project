@@ -6,7 +6,12 @@
  * NavBar, PageShell            → โครงหน้าหลัง login
  * AuthCard, BackLink           → โครงหน้า login/register และลิงก์ย้อนกลับ
  */
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from "react";
+import type {
+  ButtonHTMLAttributes,
+  InputHTMLAttributes,
+  ReactNode,
+  TextareaHTMLAttributes,
+} from "react";
 import { useId } from "react";
 import type { User, ViewName } from "./types";
 
@@ -26,8 +31,18 @@ const buttonVariants: Record<Variant, string> = {
   confirm: "bg-ok text-white hover:brightness-110",
 };
 
-export function Button({ variant = "primary", full, className = "", ...rest }: ButtonProps) {
-  return <button className={`${buttonBase} ${buttonVariants[variant]} ${full ? "w-full" : ""} ${className}`} {...rest} />;
+export function Button({
+  variant = "primary",
+  full,
+  className = "",
+  ...rest
+}: ButtonProps) {
+  return (
+    <button
+      className={`${buttonBase} ${buttonVariants[variant]} ${full ? "w-full" : ""} ${className}`}
+      {...rest}
+    />
+  );
 }
 
 // ---- Field / TextAreaField ----------------------------------------------
@@ -43,7 +58,9 @@ export function Field({ label, hint, className = "", ...rest }: FieldProps) {
   const id = useId();
   return (
     <div>
-      <label htmlFor={id} className="mb-1 block text-sm text-ink-soft">{label}</label>
+      <label htmlFor={id} className="mb-1 block text-sm text-ink-soft">
+        {label}
+      </label>
       <input id={id} className={`${fieldControl} ${className}`} {...rest} />
       {hint && <p className="mt-1 text-xs text-ink-mute">{hint}</p>}
     </div>
@@ -54,12 +71,23 @@ interface TextAreaFieldProps extends TextareaHTMLAttributes<HTMLTextAreaElement>
   label: string;
   hint?: string;
 }
-export function TextAreaField({ label, hint, className = "", ...rest }: TextAreaFieldProps) {
+export function TextAreaField({
+  label,
+  hint,
+  className = "",
+  ...rest
+}: TextAreaFieldProps) {
   const id = useId();
   return (
     <div>
-      <label htmlFor={id} className="mb-1 block text-sm text-ink-soft">{label}</label>
-      <textarea id={id} className={`${fieldControl} leading-relaxed ${className}`} {...rest} />
+      <label htmlFor={id} className="mb-1 block text-sm text-ink-soft">
+        {label}
+      </label>
+      <textarea
+        id={id}
+        className={`${fieldControl} leading-relaxed ${className}`}
+        {...rest}
+      />
       {hint && <p className="mt-1 text-xs text-ink-mute">{hint}</p>}
     </div>
   );
@@ -73,30 +101,67 @@ interface NavBarProps {
   onNavigate: (view: ViewName) => void;
   onLogout: () => void;
 }
-interface NavItem { view: ViewName; label: string; adminOnly?: boolean }
+interface NavItem {
+  view: ViewName;
+  label: string;
+  adminOnly?: boolean;
+  matchViews: ViewName[];
+}
 const navItems: NavItem[] = [
-  { view: "subjects", label: "รายวิชา" },
-  { view: "ocr", label: "แปลงภาพเป็นข้อความ" },
-  { view: "dashboard", label: "ภาพรวมระบบ", adminOnly: true },
+  {
+    view: "notes",
+    label: "คลังโน้ต (Notes)",
+    matchViews: ["notes", "note-detail"],
+  },
+  {
+    view: "subjects",
+    label: "วิกิวิชาการ (Wiki)",
+    matchViews: ["subjects", "topics", "note", "editor"],
+  },
+  {
+    view: "ocr",
+    label: "แปลงภาพเป็นข้อความ",
+    matchViews: ["ocr"],
+  },
+  {
+    view: "dashboard",
+    label: "ภาพรวมระบบ",
+    adminOnly: true,
+    matchViews: ["dashboard"],
+  },
 ];
 
 export function NavBar({ user, current, onNavigate, onLogout }: NavBarProps) {
-  const visible = navItems.filter((item) => !item.adminOnly || user.role === "admin");
+  const visible = navItems.filter(
+    (item) => !item.adminOnly || user.role === "admin",
+  );
   return (
-    <header className="border-b border-paper-rule bg-white">
+    <header className="border-b border-paper-rule bg-white sticky top-0 z-40 shadow-xs">
       <nav className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-6 gap-y-3 px-5 py-3">
-        <button onClick={() => onNavigate("subjects")} className="text-base font-semibold tracking-tight text-ink">
-          คลังโน้ต<span className="text-ink-mute">.สาขา</span>
+        <button
+          onClick={() => onNavigate("notes")}
+          className="text-base font-bold tracking-tight text-ink hover:opacity-85 transition-opacity flex items-center gap-1.5"
+        >
+          <span className="rounded bg-ink text-white px-1.5 py-0.5 text-xs font-mono">
+            CE
+          </span>
+          <span>Notes Hub</span>
+          <span className="text-xs text-ink-mute font-normal">วิศวะคอมฯ</span>
         </button>
-        <ul className="flex items-center gap-1 text-sm">
+        <ul className="flex items-center gap-1.5 text-sm">
           {visible.map((item) => {
-            const active = current === item.view;
+            const active = item.matchViews.includes(current);
             return (
               <li key={item.view}>
                 <button
                   onClick={() => onNavigate(item.view)}
                   aria-current={active ? "page" : undefined}
-                  className={"rounded px-2.5 py-1.5 transition-colors " + (active ? "bg-marker font-medium text-ink" : "text-ink-soft hover:text-ink")}
+                  className={
+                    "rounded-md px-3 py-1.5 text-sm font-medium transition-all " +
+                    (active
+                      ? "bg-marker-deep/20 text-ink ring-1 ring-marker-deep/40 shadow-xs font-semibold"
+                      : "text-ink-soft hover:text-ink hover:bg-paper-rule/60")
+                  }
                 >
                   {item.label}
                 </button>
@@ -105,8 +170,20 @@ export function NavBar({ user, current, onNavigate, onLogout }: NavBarProps) {
           })}
         </ul>
         <div className="ml-auto flex items-center gap-3 text-sm">
-          <span className="text-ink-mute">{user.full_name}{user.role === "admin" && " · ผู้ดูแล"}</span>
-          <button onClick={onLogout} className="text-pen hover:underline">ออกจากระบบ</button>
+          <span className="text-ink-mute text-xs sm:text-sm">
+            {user.full_name}
+            {user.role === "admin" && (
+              <span className="ml-1 rounded bg-pen/10 text-pen px-1.5 py-0.5 text-xs font-medium">
+                Admin
+              </span>
+            )}
+          </span>
+          <button
+            onClick={onLogout}
+            className="text-pen hover:underline text-xs sm:text-sm"
+          >
+            ออกจากระบบ
+          </button>
         </div>
       </nav>
     </header>
@@ -127,11 +204,27 @@ interface PageShellProps {
   width?: "narrow" | "wide";
   children: ReactNode;
 }
-export function PageShell({ user, current, onNavigate, onLogout, title, description, breadcrumb, actions, width = "narrow", children }: PageShellProps) {
+export function PageShell({
+  user,
+  current,
+  onNavigate,
+  onLogout,
+  title,
+  description,
+  breadcrumb,
+  actions,
+  width = "narrow",
+  children,
+}: PageShellProps) {
   const max = width === "wide" ? "max-w-5xl" : "max-w-3xl";
   return (
     <div className="min-h-screen bg-paper">
-      <NavBar user={user} current={current} onNavigate={onNavigate} onLogout={onLogout} />
+      <NavBar
+        user={user}
+        current={current}
+        onNavigate={onNavigate}
+        onLogout={onLogout}
+      />
       <main className={`mx-auto ${max} px-5 py-8 sm:py-10`}>
         {breadcrumb && <div className="mb-5">{breadcrumb}</div>}
         <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
@@ -139,7 +232,9 @@ export function PageShell({ user, current, onNavigate, onLogout, title, descript
             <h1 className="text-2xl font-semibold tracking-tight text-ink sm:text-[28px]">
               <span className="marker-underline">{title}</span>
             </h1>
-            {description && <p className="mt-2 max-w-[60ch] text-ink-soft">{description}</p>}
+            {description && (
+              <p className="mt-2 max-w-[60ch] text-ink-soft">{description}</p>
+            )}
           </div>
           {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
         </div>
@@ -151,8 +246,18 @@ export function PageShell({ user, current, onNavigate, onLogout, title, descript
 
 // ---- BackLink ---------------------------------------------------------
 
-export function BackLink({ label, onClick }: { label: string; onClick: () => void }) {
-  return <button onClick={onClick} className="text-sm text-pen hover:underline">← {label}</button>;
+export function BackLink({
+  label,
+  onClick,
+}: {
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button onClick={onClick} className="text-sm text-pen hover:underline">
+      ← {label}
+    </button>
+  );
 }
 
 // ---- AuthCard: โครงหน้า login / register ใช้ร่วมกัน -----------------------
@@ -168,12 +273,68 @@ export function AuthCard({ title, subtitle, children, footer }: AuthCardProps) {
     <div className="flex min-h-screen items-center justify-center bg-paper px-5 py-10">
       <div className="w-full max-w-sm">
         <div className="mb-7">
-          <p className="text-sm text-ink-mute">คณะวิทยาการคอมพิวเตอร์</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-ink"><span className="marker-underline">{title}</span></h1>
-          <p className="mt-2 text-sm leading-relaxed text-ink-soft">{subtitle}</p>
+          <p className="text-sm text-ink-mute">คณะวิศวะกรรมคอมพิวเตอร์</p>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-ink">
+            <span className="marker-underline">{title}</span>
+          </h1>
+          <p className="mt-2 text-sm leading-relaxed text-ink-soft">
+            {subtitle}
+          </p>
         </div>
-        <div className="rounded-sheet border border-paper-rule bg-white p-6 shadow-sheet">{children}</div>
+        <div className="rounded-sheet border border-paper-rule bg-white p-6 shadow-sheet">
+          {children}
+        </div>
         <div className="mt-4 text-center text-sm text-ink-soft">{footer}</div>
+      </div>
+    </div>
+  );
+}
+
+// ---- Modal ----------------------------------------------------------------
+
+interface ModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  title: string;
+  description?: string;
+  children: ReactNode;
+}
+
+export function Modal({
+  isOpen,
+  onClose,
+  title,
+  description,
+  children,
+}: ModalProps) {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 bg-ink/40 backdrop-blur-xs transition-opacity"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+      {/* Dialog */}
+      <div className="relative z-10 w-full max-w-lg rounded-sheet border border-paper-rule bg-white p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div className="mb-5 flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-semibold text-ink">{title}</h2>
+            {description && (
+              <p className="mt-1 text-sm text-ink-soft">{description}</p>
+            )}
+          </div>
+          <button
+            onClick={onClose}
+            type="button"
+            className="rounded p-1 text-ink-mute hover:bg-paper-rule hover:text-ink transition-colors"
+            title="ปิด"
+          >
+            ✕
+          </button>
+        </div>
+        {children}
       </div>
     </div>
   );

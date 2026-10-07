@@ -1,11 +1,15 @@
-from __future__ import annotations
-
 import io
 import logging
+import os
+import shutil
 import pytesseract
 from PIL import Image
 
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+# ตรวจสอบ path ของ Tesseract ให้ทำงานได้ทั้งใน Docker (Linux) และเครื่อง Local (Windows)
+if not shutil.which("tesseract"):
+    default_win_path = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+    if os.path.exists(default_win_path):
+        pytesseract.pytesseract.tesseract_cmd = default_win_path
 
 try:
     import fitz  # PyMuPDF
@@ -16,6 +20,11 @@ try:
     import pypdf
 except ImportError:
     pypdf = None
+
+try:
+    import pdf2image
+except ImportError:
+    pdf2image = None
 
 logger = logging.getLogger(__name__)
 
@@ -62,30 +71,44 @@ def _extract_from_pdf(file_bytes: bytes) -> str:
         except Exception as e:
             logger.warning(f"pypdf extract failed, fallback to image OCR: {e}")
 
-    # 2. ถ้าไม่มี Text (เป็นภาพสแกน) ให้แปลงหน้า PDF เป็นรูปภาพด้วย PyMuPDF แล้วสแกน OCR
-    if fitz is None:
-        raise OcrError("เซิร์ฟเวอร์ยังไม่ได้ติดตั้ง PyMuPDF (pip install PyMuPDF)")
+    # 2. ถ้าไม่มีข้อความดิจิทัล (เป็นภาพสแกน) ให้แปลงหน้า PDF เป็นรูปภาพแล้วทำ OCR
+    # ลองใช้ PyMuPDF (fitz) ก่อน ถ้าไม่มีให้สลับไปใช้ pdf2image
+    if fitz is not None:
+        try:
+            doc = fitz.open(stream=file_bytes, filetype="pdf")
+            if len(doc) > MAX_PDF_PAGES:
+                raise OcrError(f"PDF ยาวเกินไป (จำกัดไม่เกิน {MAX_PDF_PAGES} หน้าต่อครั้ง)")
 
-    try:
-        doc = fitz.open(stream=file_bytes, filetype="pdf")
-        if len(doc) > MAX_PDF_PAGES:
-            raise OcrError(f"PDF ยาวเกินไป (จำกัดไม่เกิน {MAX_PDF_PAGES} หน้าต่อครั้ง)")
+            texts = []
+            for page_num in range(min(len(doc), MAX_PDF_PAGES)):
+                page = doc.load_page(page_num)
+                pix = page.get_pixmap(dpi=300)  # แปลงเป็นภาพคมชัดระดับ 300 DPI
+                img = Image.open(io.BytesIO(pix.tobytes("png")))
+                
+                text = pytesseract.image_to_string(img, lang=OCR_LANG).strip()
+                if text:
+                    texts.append(text)
 
-        texts = []
-        for page_num in range(min(len(doc), MAX_PDF_PAGES)):
-            page = doc.load_page(page_num)
-            pix = page.get_pixmap(dpi=300)  # แปลงเป็นภาพคมชัดระดับ 300 DPI
-            img = Image.open(io.BytesIO(pix.tobytes("png")))
-            
-            text = pytesseract.image_to_string(img, lang=OCR_LANG).strip()
-            if text:
-                texts.append(text)
+            doc.close()
+            return "\n\n".join(texts)
+        except OcrError:
+            raise
+        except Exception as exc:
+            logger.error(f"PyMuPDF OCR Error: {exc}", exc_info=True)
+            raise OcrError("เปิดไฟล์ PDF ด้วย PyMuPDF ไม่สำเร็จ ไฟล์อาจเสียหรือติดรหัสผ่าน") from exc
 
-        doc.close()
-        return "\n\n".join(texts)
+    elif pdf2image is not None:
+        try:
+            images = pdf2image.convert_from_bytes(file_bytes, first_page=1, last_page=MAX_PDF_PAGES)
+            texts = []
+            for img in images:
+                text = pytesseract.image_to_string(img, lang=OCR_LANG).strip()
+                if text:
+                    texts.append(text)
+            return "\n\n".join(texts)
+        except Exception as exc:
+            logger.error(f"pdf2image OCR Error: {exc}", exc_info=True)
+            raise OcrError("แปลงหน้า PDF ด้วย pdf2image ไม่สำเร็จ") from exc
 
-    except OcrError:
-        raise
-    except Exception as exc:
-        logger.error(f"PDF OCR Error: {exc}", exc_info=True)
-        raise OcrError("เปิดไฟล์ PDF ไม่ได้ ไฟล์อาจเสียหรือถูกล็อกด้วยรหัสผ่าน") from exc
+    else:
+        raise OcrError("เซิร์ฟเวอร์ยังไม่ได้ติดตั้งไลบรารีอ่าน PDF (PyMuPDF หรือ pdf2image)")
