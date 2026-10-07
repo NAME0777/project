@@ -507,7 +507,7 @@ export function NoteView({
               }}
               className="text-redpen border border-redpen/30 hover:bg-redpen-soft hover:border-redpen"
             >
-              🗑 ลบโน้ต
+              ลบโน้ต
             </Button>
           )}
         </>
