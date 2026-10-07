@@ -50,6 +50,9 @@ export interface Note {
   subject_name?: string;
   title: string;
   content: string;
+  author?: number | null;
+  author_id?: number | null;
+  author_name?: string;
   source_file?: string | null;
   created_at: string;
   updated_at: string;

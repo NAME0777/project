@@ -7,21 +7,28 @@ from rest_framework.views import APIView
 
 from .models import Note, Revision
 from .serializers import CreateNoteSerializer, NoteSerializer
+from .permissions import IsAuthorOrAdmin
 from subjects.models import Topic
 
 
-class NoteDetailView(generics.RetrieveUpdateAPIView):
-    """รองรับทั้งดูรายละเอียด (GET) และแก้ไข/แนบไฟล์ใหม่ (PUT, PATCH) แบบ multipart/form-data"""
+class NoteDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """รองรับทั้งดูรายละเอียด (GET), แก้ไข/แนบไฟล์ใหม่ (PUT, PATCH) และลบ (DELETE)"""
     serializer_class = NoteSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, IsAuthorOrAdmin]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get_object(self):
         pk = self.kwargs.get("pk")
-        note = Note.objects.prefetch_related("revisions", "revisions__editor").filter(pk=pk).first()
-        if note:
-            return note
-        raise Http404("ไม่พบข้อมูลโน้ต")
+        note = (
+            Note.objects.select_related("author", "subject")
+            .prefetch_related("revisions", "revisions__editor")
+            .filter(pk=pk)
+            .first()
+        )
+        if not note:
+            raise Http404("ไม่พบข้อมูลโน้ต")
+        self.check_object_permissions(self.request, note)
+        return note
 
     def perform_update(self, serializer):
         old_content = serializer.instance.content
@@ -41,6 +48,11 @@ class NoteDetailView(generics.RetrieveUpdateAPIView):
             content=note.content,
         )
 
+    def perform_destroy(self, instance):
+        if instance.source_file:
+            instance.source_file.delete(save=False)
+        instance.delete()
+
 
 class NoteListCreateView(generics.ListCreateAPIView):
     """รายการโน้ตทั้งหมด (GET) และสร้างโน้ตใหม่ (POST) พร้อมอัปโหลดไฟล์แนบแบบ multipart/form-data"""
@@ -53,7 +65,7 @@ class NoteListCreateView(generics.ListCreateAPIView):
         return NoteSerializer
 
     def get_queryset(self):
-        qs = Note.objects.select_related("subject").prefetch_related("revisions", "revisions__editor").all()
+        qs = Note.objects.select_related("subject", "author").prefetch_related("revisions", "revisions__editor").all()
         subject_id = self.request.query_params.get("subject")
         if subject_id:
             qs = qs.filter(subject_id=subject_id)

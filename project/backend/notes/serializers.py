@@ -16,6 +16,8 @@ class NoteSerializer(serializers.ModelSerializer):
     source_file = serializers.FileField(required=False, allow_null=True)
     subject_code = serializers.CharField(source="subject.code", read_only=True, default="")
     subject_name = serializers.CharField(source="subject.name", read_only=True, default="")
+    author_id = serializers.IntegerField(source="author.id", read_only=True, allow_null=True, default=None)
+    author_name = serializers.CharField(source="author.full_name", read_only=True, default="")
 
     class Meta:
         model = Note
@@ -26,12 +28,24 @@ class NoteSerializer(serializers.ModelSerializer):
             "subject_name",
             "title",
             "content",
+            "author",
+            "author_id",
+            "author_name",
             "source_file",
             "created_at",
             "updated_at",
             "revisions",
         ]
-        read_only_fields = ["created_at", "updated_at", "revisions", "subject_code", "subject_name"]
+        read_only_fields = [
+            "created_at",
+            "updated_at",
+            "revisions",
+            "subject_code",
+            "subject_name",
+            "author",
+            "author_id",
+            "author_name",
+        ]
 
     def to_representation(self, instance):
         ret = super().to_representation(instance)
@@ -61,7 +75,7 @@ class CreateNoteSerializer(serializers.ModelSerializer):
 
         editor = self.context["request"].user
         topic_id = validated_data.pop("topic", None)
-        note = Note.objects.create(**validated_data)
+        note = Note.objects.create(author=editor, **validated_data)
         summary = "สร้างโน้ตพร้อมแนบไฟล์เอกสาร" if note.source_file else "สร้างโน้ตใหม่"
         Revision.objects.create(note=note, editor=editor, summary=summary, content=note.content)
 
