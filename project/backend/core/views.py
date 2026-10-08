@@ -4,7 +4,10 @@
 
 """
 
+import logging
+
 from django.contrib.auth import get_user_model
+from django.http import HttpResponse
 
 from django.db.models import Count
 
@@ -25,10 +28,12 @@ from subjects.models import Subject, Topic
 from .ocr import OcrError, extract_text
 
 from .permissions import IsAdminRole
+from .speech import synthesize_audio
 
 
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 
@@ -87,6 +92,30 @@ class OcrView(APIView):
             )
 
         return Response({"text": text})
+
+
+class SpeechView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        text = request.data.get("text")
+        language = request.data.get("language")
+        if not isinstance(text, str) or not text.strip():
+            return Response({"error": "กรุณาระบุข้อความที่ต้องการอ่าน"}, status=400)
+        if len(text) > 20000:
+            return Response({"error": "ข้อความยาวเกินไป (จำกัด 20,000 ตัวอักษร)"}, status=400)
+        if language not in ("en-US", "th-TH"):
+            return Response({"error": "รองรับเฉพาะภาษาอังกฤษและภาษาไทย"}, status=400)
+
+        try:
+            audio = synthesize_audio(text, language)
+        except Exception:
+            logger.exception("Online text-to-speech request failed")
+            return Response({"error": "สร้างเสียงอ่านไม่สำเร็จ กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองอีกครั้ง"}, status=502)
+
+        response = HttpResponse(audio, content_type="audio/mpeg")
+        response["Cache-Control"] = "no-store"
+        return response
 
 
 

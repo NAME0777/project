@@ -56,6 +56,24 @@ async function request<T>(path: string, options?: RequestInit, includeApiToken =
   return res.status === 204 ? (undefined as T) : res.json();
 }
 
+async function requestBlob(path: string, body: unknown): Promise<Blob> {
+  const tokens = loadTokens();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (tokens) headers.Authorization = `Bearer ${tokens.access}`;
+  const res = await fetch(`${BASE}${path}`, { method: "POST", headers, body: JSON.stringify(body) });
+
+  if (res.status === 401 && tokens) saveTokens(null);
+  if (!res.ok) {
+    const responseBody = await res.json().catch(() => ({}));
+    const message =
+      (responseBody as { error?: string; detail?: string }).error ??
+      (responseBody as { error?: string; detail?: string }).detail ??
+      `คำขอไม่สำเร็จ (${res.status})`;
+    throw new Error(String(message));
+  }
+  return res.blob();
+}
+
 interface AuthResponse {
   user: { id: number; email: string; full_name: string; role: Role; student_id: string | null };
   access: string;
@@ -164,6 +182,8 @@ export const api = {
     form.set("file", file);
     return request<{ text: string }>("/ocr/", { method: "POST", body: form });
   },
+
+  synthesizeSpeech: (text: string, language: string) => requestBlob("/speech/", { text, language }),
 
   getDashboard: () =>
     request<{ stats: { label: string; value: string }[]; recentEdits: { who: string; what: string; subject: string; date: string }[] }>(

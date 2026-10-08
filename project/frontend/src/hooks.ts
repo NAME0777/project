@@ -224,35 +224,133 @@ export function useNote(noteId: number | undefined) {
 
 export function useSpeech() {
   const [isPlaying, setIsPlaying] = useState(false);
-  const supported = typeof window !== "undefined" && "speechSynthesis" in window;
-  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const playbackId = useRef(0);
+  const activeAudio = useRef<HTMLAudioElement | null>(null);
+  const activeUrl = useRef<string | null>(null);
+  const supported = typeof window !== "undefined" && "Audio" in window;
 
   const stop = useCallback(() => {
-    if (supported) window.speechSynthesis.cancel();
+    playbackId.current += 1;
+    activeAudio.current?.pause();
+    if (activeAudio.current) activeAudio.current.src = "";
+    activeAudio.current = null;
+    if (activeUrl.current) URL.revokeObjectURL(activeUrl.current);
+    activeUrl.current = null;
     setIsPlaying(false);
-  }, [supported]);
+    setError(null);
+  }, []);
 
   const speak = useCallback(
     (text: string) => {
       if (!supported) return;
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = "th-TH";
-      utterance.rate = 0.95;
-      utterance.onend = () => setIsPlaying(false);
-      utterance.onerror = () => setIsPlaying(false);
-      utteranceRef.current = utterance;
-      window.speechSynthesis.speak(utterance);
+      stop();
+      if (!text.trim()) {
+        setIsPlaying(false);
+        return;
+      }
+      const initialLanguage = /[\u0E00-\u0E7F]/.test(text) ? "th-TH" : "en-US";
+      const languageRuns: { text: string; lang: string }[] = [];
+      let currentLanguage = initialLanguage;
+
+      for (const part of text.match(/[\u0E00-\u0E7F]+|[A-Za-z]+|[^A-Za-z\u0E00-\u0E7F]+/g) ?? [text]) {
+        if (/[\u0E00-\u0E7F]/.test(part)) currentLanguage = "th-TH";
+        else if (/[A-Za-z]/.test(part)) currentLanguage = "en-US";
+
+        const previousRun = languageRuns[languageRuns.length - 1];
+        if (previousRun?.lang === currentLanguage) {
+          previousRun.text += part;
+        } else {
+          languageRuns.push({ text: part, lang: currentLanguage });
+        }
+      }
+
+      const runs: typeof languageRuns = [];
+      let leadingSymbols = "";
+      for (const run of languageRuns) {
+        if (!/[A-Za-z0-9\u0E00-\u0E7F]/.test(run.text)) {
+          if (runs.length > 0) runs[runs.length - 1].text += run.text;
+          else leadingSymbols += run.text;
+          continue;
+        }
+
+        let remaining = `${leadingSymbols}${run.text}`;
+        leadingSymbols = "";
+        while (remaining.length > 2000) {
+          let splitAt = remaining.lastIndexOf(" ", 2000);
+          if (splitAt < 1) splitAt = 2000;
+          runs.push({ text: remaining.slice(0, splitAt).trim(), lang: run.lang });
+          remaining = remaining.slice(splitAt).trimStart();
+        }
+        if (remaining) runs.push({ text: remaining, lang: run.lang });
+      }
+      if (leadingSymbols && runs.length > 0) runs[0].text = `${leadingSymbols}${runs[0].text}`;
+      if (runs.length === 0) {
+        setError("ไม่พบตัวอักษรที่อ่านออกเสียงได้");
+        return;
+      }
+
+      const currentPlaybackId = playbackId.current;
+      const speakRun = async (index: number, retry = 0) => {
+        if (playbackId.current !== currentPlaybackId) return;
+        const run = runs[index];
+        if (!run) {
+          setIsPlaying(false);
+          return;
+        }
+
+        try {
+          const blob = await api.synthesizeSpeech(run.text, run.lang);
+          if (playbackId.current !== currentPlaybackId) return;
+          const url = URL.createObjectURL(blob);
+          activeUrl.current = url;
+          const audio = new Audio(url);
+          activeAudio.current = audio;
+          const releaseAudio = () => {
+            if (activeAudio.current === audio) activeAudio.current = null;
+            if (activeUrl.current === url) {
+              URL.revokeObjectURL(url);
+              activeUrl.current = null;
+            }
+          };
+          audio.onended = () => {
+            releaseAudio();
+            void speakRun(index + 1);
+          };
+          audio.onerror = () => {
+            releaseAudio();
+            if (playbackId.current === currentPlaybackId) {
+              setError("เล่นเสียงบางช่วงไม่สำเร็จ กำลังข้ามไปอ่านช่วงถัดไป");
+              void speakRun(index + 1);
+            }
+          };
+          await audio.play();
+        } catch (cause) {
+          if (playbackId.current !== currentPlaybackId) return;
+          if (retry === 0) {
+            setError("บริการเสียงสะดุด กำลังลองอ่านข้อความช่วงนี้อีกครั้ง");
+            window.setTimeout(() => {
+              if (playbackId.current === currentPlaybackId) void speakRun(index, 1);
+            }, 1200);
+            return;
+          }
+          const detail = cause instanceof Error ? cause.message : "บริการเสียงออนไลน์ไม่ตอบกลับ";
+          setError(`อ่านบางช่วงไม่สำเร็จ กำลังข้ามไปช่วงถัดไป: ${detail}`);
+          void speakRun(index + 1);
+        }
+      };
+
       setIsPlaying(true);
+      void speakRun(0);
     },
-    [supported]
+    [supported, stop]
   );
 
   const toggle = useCallback((text: string) => (isPlaying ? stop() : speak(text)), [isPlaying, speak, stop]);
 
   useEffect(() => stop, [stop]);
 
-  return { isPlaying, supported, speak, stop, toggle };
+  return { isPlaying, supported, error, speak, stop, toggle };
 }
 
 // ---- useOcr ------------------------------------------------------------------

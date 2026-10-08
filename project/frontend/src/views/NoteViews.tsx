@@ -513,6 +513,14 @@ export function NoteView({
         </>
       }
     >
+      {speech.error && (
+        <p className="mb-4 rounded border border-redpen/30 bg-redpen-soft px-3 py-2 text-sm text-redpen">
+          {speech.error}
+        </p>
+      )}
+      <p className="mb-4 text-xs text-ink-mute">
+        ใช้เสียงออนไลน์ของ Microsoft Edge โดยส่งข้อความที่อ่านไปสร้างเสียง
+      </p>
       {rollbackSuccess && (
         <div className="mb-5 flex items-center justify-between rounded border border-ok/30 bg-ok-soft px-4 py-3 text-sm text-ok">
           <span>{rollbackSuccess}</span>
