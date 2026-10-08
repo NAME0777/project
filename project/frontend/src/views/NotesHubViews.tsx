@@ -564,7 +564,7 @@ export function NotesHubView({
               </p>
             </div>
           </div>
-
+                                  
           {modalError && (
             <div className="rounded border border-redpen/30 bg-redpen-soft px-3 py-2 text-sm text-redpen">
               {modalError}

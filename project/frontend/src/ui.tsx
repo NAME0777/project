@@ -265,28 +265,63 @@ export function BackLink({
 interface AuthCardProps {
   title: string;
   subtitle: string;
+  panelTitle?: string;
+  panelSubtitle?: string;
   children: ReactNode;
   footer: ReactNode;
 }
-export function AuthCard({ title, subtitle, children, footer }: AuthCardProps) {
+export function AuthCard({ title, subtitle, panelTitle, panelSubtitle, children, footer }: AuthCardProps) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-paper px-5 py-10">
-      <div className="w-full max-w-sm">
-        <div className="mb-7">
-          <p className="text-sm text-ink-mute">คณะวิศวะกรรมคอมพิวเตอร์</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-ink">
-            <span className="marker-underline">{title}</span>
+    <main className="min-h-screen bg-paper lg:grid lg:grid-cols-2">
+      <section className="auth-visual relative flex min-h-[280px] flex-col justify-between overflow-hidden px-6 py-6 text-white sm:px-10 sm:py-8 lg:min-h-screen lg:px-12 lg:py-10 xl:px-16">
+        <div aria-hidden="true" className="auth-grid absolute inset-0" />
+        <div className="relative z-10 flex items-center gap-3">
+          <span className="flex size-11 items-center justify-center rounded bg-marker text-sm font-bold text-ink shadow-lg">CE</span>
+          <div>
+            <p className="text-lg font-semibold leading-tight">Notes Hub</p>
+            <p className="mt-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-white/65">Computer Engineering · KMITL</p>
+          </div>
+        </div>
+
+        <div className="relative z-10 mt-10 max-w-xl lg:my-auto lg:py-16">
+          <p className="mb-3 text-xs font-semibold tracking-[0.08em] text-marker">บันทึกความรู้ · KMITL</p>
+          <h1 className="max-w-[15ch] whitespace-pre-line text-3xl font-semibold leading-tight text-white sm:text-4xl lg:text-[42px]">
+            {title}
           </h1>
-          <p className="mt-2 text-sm leading-relaxed text-ink-soft">
+          <p className="mt-4 max-w-[42ch] text-sm leading-7 text-white/75 sm:text-base">
             {subtitle}
           </p>
         </div>
-        <div className="rounded-sheet border border-paper-rule bg-white p-6 shadow-sheet">
-          {children}
+
+        <div aria-hidden="true" className="auth-note-art pointer-events-none absolute bottom-12 right-12 hidden h-52 w-64 rotate-[5deg] rounded-sm p-5 xl:block">
+          <div className="flex items-center justify-between border-b border-paper-rule pb-3">
+            <span className="text-[10px] font-semibold tracking-[0.16em] text-pen">FIELD NOTES</span>
+            <span className="rounded-sm bg-marker px-2 py-1 text-[9px] font-bold text-ink">CE / 01</span>
+          </div>
+          <div className="mt-4 space-y-3">
+            <div className="h-2 w-3/4 rounded-full bg-ink/80" />
+            <div className="h-1.5 w-full rounded-full bg-ink/15" />
+            <div className="h-1.5 w-5/6 rounded-full bg-ink/15" />
+            <div className="mt-5 h-7 w-2/3 rounded-sm bg-marker/80" />
+            <div className="h-1.5 w-4/5 rounded-full bg-ink/15" />
+          </div>
+          <div className="absolute -bottom-3 -left-3 size-8 rounded-full border-[6px] border-pen/80 bg-paper" />
         </div>
-        <div className="mt-4 text-center text-sm text-ink-soft">{footer}</div>
-      </div>
-    </div>
+      </section>
+
+      <section className="flex min-h-[calc(100vh-280px)] items-center justify-center px-5 py-10 sm:px-8 lg:min-h-screen lg:px-12">
+        <div className="auth-enter w-full max-w-md">
+          <div className="mb-5">
+            {panelTitle && <h2 className="mt-2 text-2xl font-semibold text-ink">{panelTitle}</h2>}
+            {panelSubtitle && <p className="mt-1 text-sm text-ink-soft">{panelSubtitle}</p>}
+          </div>
+          <div className="rounded-sheet border border-paper-rule bg-white p-5 shadow-sheet sm:p-8">
+            {children}
+          </div>
+          <div className="mt-5 text-center text-sm text-ink-soft">{footer}</div>
+        </div>
+      </section>
+    </main>
   );
 }
 

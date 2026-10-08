@@ -6,7 +6,7 @@
  * ปุ่มเพิ่ม/ลบ แสดงเฉพาะผู้ดูแลระบบ (role=admin) — นักศึกษาดูได้อย่างเดียว
  */
 import { useState } from "react";
-import { BackLink, Button, Field, PageShell } from "../ui";
+import { BackLink, Button, Field, Modal, PageShell } from "../ui";
 import type { Subject, Topic, User, ViewName } from "../types";
 
 // ---- SubjectsView ----------------------------------------------------------
@@ -38,6 +38,8 @@ export function SubjectsView({
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [subjectToDelete, setSubjectToDelete] = useState<Subject | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const submit = async () => {
     if (!form.code.trim() || !form.name.trim() || !form.term.trim()) {
@@ -59,11 +61,15 @@ export function SubjectsView({
     }
   };
 
-  const remove = async (id: number, name: string) => {
-    if (!window.confirm(`ลบวิชา "${name}" ทิ้งเลยไหม? หัวข้อและโน้ตในวิชานี้จะหายไปด้วย`)) return;
-    setDeletingId(id);
+  const confirmDelete = async () => {
+    if (!subjectToDelete) return;
+    setDeleteError(null);
+    setDeletingId(subjectToDelete.id);
     try {
-      await onDeleteSubject(id);
+      await onDeleteSubject(subjectToDelete.id);
+      setSubjectToDelete(null);
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "ลบรายวิชาไม่สำเร็จ");
     } finally {
       setDeletingId(null);
     }
@@ -130,7 +136,7 @@ export function SubjectsView({
               </button>
               {isAdmin && (
                 <button
-                  onClick={(e) => { e.stopPropagation(); remove(subject.id, subject.name); }}
+                  onClick={(e) => { e.stopPropagation(); setDeleteError(null); setSubjectToDelete(subject); }}
                   disabled={deletingId === subject.id}
                   className="absolute right-3 top-3 rounded px-2 py-1 text-xs text-redpen hover:bg-redpen-soft disabled:opacity-50"
                 >
@@ -141,6 +147,30 @@ export function SubjectsView({
           ))}
         </ul>
       )}
+      <Modal
+        isOpen={subjectToDelete !== null}
+        onClose={() => {
+          if (deletingId === null) setSubjectToDelete(null);
+        }}
+        title="ยืนยันการลบวิชา"
+        description={`ลบวิชา "${subjectToDelete?.name ?? ""}" ทิ้งเลยไหม? หัวข้อและโน้ตในวิชานี้จะหายไปด้วย`}
+      >
+        <div className="space-y-4">
+          {deleteError && (
+            <p className="rounded border border-redpen/30 bg-redpen-soft px-3 py-2 text-sm text-redpen">
+              {deleteError}
+            </p>
+          )}
+          <div className="flex justify-end gap-2 border-t border-paper-rule pt-4">
+            <Button variant="quiet" disabled={deletingId !== null} onClick={() => setSubjectToDelete(null)}>
+              ยกเลิก
+            </Button>
+            <Button className="bg-redpen text-white hover:bg-red-700" disabled={deletingId !== null} onClick={confirmDelete}>
+              {deletingId !== null ? "กำลังลบ…" : "ลบวิชา"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </PageShell>
   );
 }
@@ -186,6 +216,8 @@ export function TopicsView({
   const [editingTitle, setEditingTitle] = useState("");
   const [editError, setEditError] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
+  const [topicToDelete, setTopicToDelete] = useState<Topic | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const nextOrder = topics.reduce((max, t) => Math.max(max, t.order), 0) + 1;
 
@@ -236,11 +268,15 @@ export function TopicsView({
     }
   };
 
-  const remove = async (id: number, title: string) => {
-    if (!window.confirm(`ลบหัวข้อ "${title}" ทิ้งเลยไหม?`)) return;
-    setDeletingId(id);
+  const confirmDelete = async () => {
+    if (!topicToDelete) return;
+    setDeleteError(null);
+    setDeletingId(topicToDelete.id);
     try {
-      await onDeleteTopic(id);
+      await onDeleteTopic(topicToDelete.id);
+      setTopicToDelete(null);
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "ลบหัวข้อไม่สำเร็จ");
     } finally {
       setDeletingId(null);
     }
@@ -357,6 +393,30 @@ export function TopicsView({
           </Button>
         </div>
       )}
+      <Modal
+        isOpen={topicToDelete !== null}
+        onClose={() => {
+          if (deletingId === null) setTopicToDelete(null);
+        }}
+        title="ยืนยันการลบหัวข้อ"
+        description={`ลบหัวข้อ "${topicToDelete?.title ?? ""}" ทิ้งเลยไหม?`}
+      >
+        <div className="space-y-4">
+          {deleteError && (
+            <p className="rounded border border-redpen/30 bg-redpen-soft px-3 py-2 text-sm text-redpen">
+              {deleteError}
+            </p>
+          )}
+          <div className="flex justify-end gap-2 border-t border-paper-rule pt-4">
+            <Button variant="quiet" disabled={deletingId !== null} onClick={() => setTopicToDelete(null)}>
+              ยกเลิก
+            </Button>
+            <Button className="bg-redpen text-white hover:bg-red-700" disabled={deletingId !== null} onClick={confirmDelete}>
+              {deletingId !== null ? "กำลังลบ…" : "ลบหัวข้อ"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </PageShell>
   );
 }

@@ -1,6 +1,7 @@
 from rest_framework import permissions, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from django.db import transaction
 
 from .models import Subject, Topic
 from .serializers import SubjectSerializer, TopicSerializer
@@ -30,6 +31,12 @@ class SubjectViewSet(viewsets.ModelViewSet):
     serializer_class = SubjectSerializer
     permission_classes = [CanCreateOrAdminOnly]
 
+    def perform_destroy(self, instance):
+        notes = instance.notes.exclude(source_file="").exclude(source_file__isnull=True)
+        for note in notes:
+            note.source_file.delete(save=False)
+        instance.delete()
+
     @action(detail=True, methods=["get"])
     def topics(self, request, pk=None):
         subject = self.get_object()
@@ -51,3 +58,12 @@ class TopicViewSet(viewsets.ModelViewSet):
         qs = super().get_queryset()
         subject_id = self.request.query_params.get("subject")
         return qs.filter(subject_id=subject_id) if subject_id else qs
+
+    @transaction.atomic
+    def perform_destroy(self, instance):
+        note = instance.note
+        if note is not None:
+            if note.source_file:
+                note.source_file.delete(save=False)
+            note.delete()
+        instance.delete()

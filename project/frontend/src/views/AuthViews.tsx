@@ -33,6 +33,7 @@ interface LoginViewProps {
 export function LoginView({ onLogin, onGoogleLogin, error, pending }: LoginViewProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const googleButton = useRef<HTMLDivElement>(null);
   const googleLoginRef = useRef(onGoogleLogin);
@@ -57,7 +58,7 @@ export function LoginView({ onLogin, onGoogleLogin, error, pending }: LoginViewP
         size: "large",
         text: "signin_with",
         shape: "rectangular",
-        width: "320",
+        width: String(Math.min(320, googleButton.current.clientWidth || 320)),
       });
     };
 
@@ -86,25 +87,37 @@ export function LoginView({ onLogin, onGoogleLogin, error, pending }: LoginViewP
 
   return (
     <AuthCard
-      title="คลังโน้ตเรียนประจำสาขา"
-      subtitle="โน้ตของรุ่นพี่ที่รุ่นน้องช่วยกันแก้ให้ดีขึ้นทุกเทอม"
-      footer={<span>เข้าสู่ระบบด้วยบัญชี Google ของสถาบัน</span>}
+      title={"คลังโน้ตเรียน\nประจำสาขา"}
+      subtitle="วิศวกรรมคอมพิวเตอร์ · KMITL"
+      panelTitle="เข้าสู่ระบบ"
+      panelSubtitle="ใช้บัญชีอีเมลสถาบันของคุณ"
+      footer={<span>วิศวกรรมคอมพิวเตอร์ · KMITL</span>}
     >
       <div className="space-y-4">
-        <div>
-        <Field label="อีเมลมหาวิทยาลัย" type="email" autoComplete="username" placeholder="example@kmitl.ac.th" value={email} onChange={(e) => setEmail(e.target.value)} />
-        <Field label="รหัสผ่าน" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} />
-        <div className="mt-6">
-          <Button full onClick={submit} disabled={pending}>{pending ? "กำลังเข้าสู่ระบบ…" : "เข้าสู่ระบบ"}</Button>
+        <div className="space-y-4">
+          <Field label="อีเมลมหาวิทยาลัย" type="email" autoComplete="username" placeholder="" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <div className="relative">
+            <Field label="รหัสผ่าน" type={showPassword ? "text" : "password"} autoComplete="current-password" className="pr-16" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} />
+            <button
+              type="button"
+              aria-label={showPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
+              aria-pressed={showPassword}
+              onClick={() => setShowPassword((visible) => !visible)}
+              className="absolute bottom-2 right-2 rounded px-2 py-1 text-xs font-medium text-pen hover:bg-pen-soft"
+            >
+              {showPassword ? "ซ่อน" : "แสดง"}
+            </button>
+          </div>
         </div>
-        </div>
-        <div className="border-t border-paper-rule pt-4">
-        {googleClientId ? (
-          <div ref={googleButton} className="flex min-h-10 justify-center" />
-        ) : (
-          <p className="text-sm text-redpen">ยังไม่ได้ตั้งค่า Google Sign-In</p>
-        )}
-        {shownError && <p className="rounded border border-redpen/30 bg-redpen-soft px-3 py-2 text-sm text-redpen">{shownError}</p>}
+        <Button full onClick={submit} disabled={pending}>{pending ? "กำลังเข้าสู่ระบบ…" : "เข้าสู่ระบบ"}</Button>
+        <div className="relative border-t border-paper-rule pt-5">
+          <span className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 bg-white px-3 text-xs text-ink-mute">หรือ</span>
+          {googleClientId ? (
+            <div ref={googleButton} className="flex min-h-10 justify-center" />
+          ) : (
+            <p className="text-sm text-redpen">ยังไม่ได้ตั้งค่า Google Sign-In</p>
+          )}
+          {shownError && <p role="alert" className="mt-4 rounded border border-redpen/30 bg-redpen-soft px-3 py-2 text-sm text-redpen">{shownError}</p>}
         </div>
       </div>
     </AuthCard>
@@ -152,6 +165,7 @@ export function RegisterView({ onRegistered, onGoLogin }: RegisterViewProps) {
     <AuthCard
       title="สมัครสมาชิก"
       subtitle="ยืนยันตัวตนด้วยอีเมลสถาบัน เพื่อให้รู้ว่าใครเป็นคนแก้โน้ตแต่ละครั้ง"
+      panelTitle="สร้างบัญชีใหม่"
       footer={<>มีบัญชีแล้ว <button onClick={onGoLogin} className="text-pen hover:underline">เข้าสู่ระบบ</button></>}
     >
       <div className="space-y-4">

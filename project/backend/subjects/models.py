@@ -10,6 +10,7 @@ class Subject(models.Model):
     term = models.CharField(max_length=20, help_text='เช่น "1/2569"')
 
     class Meta:
+        db_table = "subject"
         ordering = ["code"]
 
     def __str__(self):
@@ -27,6 +28,7 @@ class Topic(models.Model):
     )
 
     class Meta:
+        db_table = "wiki"
         ordering = ["subject", "order"]
         unique_together = [("subject", "order")]
 
