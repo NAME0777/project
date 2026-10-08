@@ -31,6 +31,12 @@ class SubjectViewSet(viewsets.ModelViewSet):
     serializer_class = SubjectSerializer
     permission_classes = [CanCreateOrAdminOnly]
 
+    def perform_destroy(self, instance):
+        notes = instance.notes.exclude(source_file="").exclude(source_file__isnull=True)
+        for note in notes:
+            note.source_file.delete(save=False)
+        instance.delete()
+
     @action(detail=True, methods=["get"])
     def topics(self, request, pk=None):
         subject = self.get_object()

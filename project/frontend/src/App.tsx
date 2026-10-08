@@ -68,9 +68,6 @@ export default function App() {
           onNavigate={navigate}
           onLogout={handleLogout}
           onBack={back}
-          onWriteWiki={() =>
-            go("editor", { subjectId: route.subjectId })
-          }
           onOpenNote={(topicId, noteId, hasNote) => {
             if (hasNote && noteId) {
               go("note", { subjectId: route.subjectId, topicId, noteId });
