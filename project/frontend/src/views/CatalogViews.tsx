@@ -371,7 +371,7 @@ export function TopicsView({
                         แก้ไขหัวข้อ
                       </button>
                       <button
-                        onClick={() => { setDeleteError(null); setTopicToDelete(topic); }}
+                        onClick={() => remove(topic.id, topic.title)}
                         disabled={deletingId === topic.id}
                         className="rounded px-2 py-1 text-xs text-redpen hover:bg-redpen-soft disabled:opacity-50"
                       >

@@ -155,7 +155,7 @@ export default function App() {
               await catalog.reloadTopics?.();
               back();
             } else if (route.subjectId) {
-              // 3. สร้างโน้ตวิกิใหม่ -> บันทึกลลง DB
+              // 3. สร้างโน้ตวิกิใหม่ -> บันทึกลง DB
               const created = await api.createNote(
                 route.subjectId,
                 data.title || currentTopic?.title || "หัวข้อบทเรียน",
