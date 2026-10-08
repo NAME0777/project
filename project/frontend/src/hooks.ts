@@ -266,8 +266,16 @@ export function useSpeech() {
       }
 
       const runs: typeof languageRuns = [];
+      let leadingSymbols = "";
       for (const run of languageRuns) {
-        let remaining = run.text;
+        if (!/[A-Za-z0-9\u0E00-\u0E7F]/.test(run.text)) {
+          if (runs.length > 0) runs[runs.length - 1].text += run.text;
+          else leadingSymbols += run.text;
+          continue;
+        }
+
+        let remaining = `${leadingSymbols}${run.text}`;
+        leadingSymbols = "";
         while (remaining.length > 2000) {
           let splitAt = remaining.lastIndexOf(" ", 2000);
           if (splitAt < 1) splitAt = 2000;
@@ -276,9 +284,14 @@ export function useSpeech() {
         }
         if (remaining) runs.push({ text: remaining, lang: run.lang });
       }
+      if (leadingSymbols && runs.length > 0) runs[0].text = `${leadingSymbols}${runs[0].text}`;
+      if (runs.length === 0) {
+        setError("ไม่พบตัวอักษรที่อ่านออกเสียงได้");
+        return;
+      }
 
       const currentPlaybackId = playbackId.current;
-      const speakRun = async (index: number) => {
+      const speakRun = async (index: number, retry = 0) => {
         if (playbackId.current !== currentPlaybackId) return;
         const run = runs[index];
         if (!run) {
@@ -307,15 +320,23 @@ export function useSpeech() {
           audio.onerror = () => {
             releaseAudio();
             if (playbackId.current === currentPlaybackId) {
-              setIsPlaying(false);
-              setError("เล่นเสียงไม่สำเร็จ กรุณาลองใหม่");
+              setError("เล่นเสียงบางช่วงไม่สำเร็จ กำลังข้ามไปอ่านช่วงถัดไป");
+              void speakRun(index + 1);
             }
           };
           await audio.play();
         } catch (cause) {
           if (playbackId.current !== currentPlaybackId) return;
-          setIsPlaying(false);
-          setError(cause instanceof Error ? cause.message : "สร้างเสียงอ่านไม่สำเร็จ กรุณาลองใหม่");
+          if (retry === 0) {
+            setError("บริการเสียงสะดุด กำลังลองอ่านข้อความช่วงนี้อีกครั้ง");
+            window.setTimeout(() => {
+              if (playbackId.current === currentPlaybackId) void speakRun(index, 1);
+            }, 1200);
+            return;
+          }
+          const detail = cause instanceof Error ? cause.message : "บริการเสียงออนไลน์ไม่ตอบกลับ";
+          setError(`อ่านบางช่วงไม่สำเร็จ กำลังข้ามไปช่วงถัดไป: ${detail}`);
+          void speakRun(index + 1);
         }
       };
 
