@@ -185,6 +185,7 @@ interface TopicsViewProps {
   onNavigate: (view: ViewName) => void;
   onLogout: () => void;
   onOpenNote: (topicId: number, noteId: number | null, hasNote?: boolean) => void;
+  onWriteWiki?: () => void;
   onBack: () => void;
   onCreateTopic: (subject: number, order: number, title: string) => Promise<void>;
   onUpdateTopic: (id: number, title: string) => Promise<void>;
@@ -199,6 +200,7 @@ export function TopicsView({
   onNavigate,
   onLogout,
   onOpenNote,
+  onWriteWiki,
   onBack,
   onCreateTopic,
   onUpdateTopic,
@@ -291,9 +293,14 @@ export function TopicsView({
       breadcrumb={<BackLink label="รายวิชาทั้งหมด" onClick={onBack} />}
       actions={
         subject ? (
-          <Button variant="quiet" onClick={() => setShowForm((v) => !v)}>
-            {showForm ? "ยกเลิก" : "+ เพิ่มเฉพาะหัวข้อ"}
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button onClick={() => onWriteWiki?.()}>
+              + เขียนวิกิบทเรียน
+            </Button>
+            <Button variant="quiet" onClick={() => setShowForm((v) => !v)}>
+              {showForm ? "ยกเลิก" : "+ เพิ่มเฉพาะหัวข้อ"}
+            </Button>
+          </div>
         ) : undefined
       }
     >
@@ -381,6 +388,9 @@ export function TopicsView({
       {!loading && topics.length === 0 && (
         <div className="rounded-sheet border border-dashed border-paper-rule p-8 text-center text-ink-soft">
           <p className="mb-4">วิชานี้ยังไม่มีหัวข้อบทเรียน</p>
+          <Button onClick={() => onWriteWiki?.()}>
+            + เริ่มเขียนวิกิบทเรียนแรก
+          </Button>
         </div>
       )}
       <Modal

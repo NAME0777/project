@@ -68,6 +68,9 @@ export default function App() {
           onNavigate={navigate}
           onLogout={handleLogout}
           onBack={back}
+          onWriteWiki={() =>
+            go("editor", { subjectId: route.subjectId })
+          }
           onOpenNote={(topicId, noteId, hasNote) => {
             if (hasNote && noteId) {
               go("note", { subjectId: route.subjectId, topicId, noteId });
@@ -152,7 +155,7 @@ export default function App() {
               await catalog.reloadTopics?.();
               back();
             } else if (route.subjectId) {
-              // 3. สร้างโน้ตวิกิใหม่ -> บันทึกลง DB
+              // 3. สร้างโน้ตวิกิใหม่ -> บันทึกลลง DB
               const created = await api.createNote(
                 route.subjectId,
                 data.title || currentTopic?.title || "หัวข้อบทเรียน",
