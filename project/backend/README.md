@@ -106,5 +106,6 @@ AWS_S3_ENDPOINT_URL=http://<minio-host>:9000
 
 ## จุดที่ยังเป็น mock (รอ Phase ถัดไป)
 
-- **Text-to-Speech** — ยังไม่มี endpoint (Phase 3)
 - **Wiki diff/version compare แบบเห็นภาพ** — มี Revision เก็บครบทุกเวอร์ชันแล้ว แต่ยังไม่มี diff viewer (Phase 4)
+
+Text-to-Speech ใช้เสียงออนไลน์ของ Microsoft Edge ผ่าน `edge-tts`; ไม่ต้องใช้ API key แต่ backend ต้องเชื่อมต่ออินเทอร์เน็ตได้ และข้อความที่อ่านจะถูกส่งไปยังบริการดังกล่าว

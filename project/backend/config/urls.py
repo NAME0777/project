@@ -8,7 +8,7 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 
-from core.views import DashboardView, OcrView
+from core.views import DashboardView, OcrView, SpeechView
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -16,6 +16,7 @@ urlpatterns = [
     path("api/subjects/", include("subjects.urls")),
     path("api/notes/", include("notes.urls")),
     path("api/ocr/", OcrView.as_view(), name="ocr"),
+    path("api/speech/", SpeechView.as_view(), name="speech"),
     path("api/dashboard/", DashboardView.as_view(), name="dashboard"),
 ]
 
